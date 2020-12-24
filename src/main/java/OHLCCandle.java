@@ -41,12 +41,6 @@ public class OHLCCandle {
     }
   }
 
-  public enum Colour {
-    RED,
-    GREEN,
-    NONE
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -65,5 +59,15 @@ public class OHLCCandle {
   @Override
   public int hashCode() {
     return Objects.hash(open, high, low, close);
+  }
+
+  @Override
+  public String toString() {
+    return "OHLCCandle{" +
+        "open=" + open +
+        ", high=" + high +
+        ", low=" + low +
+        ", close=" + close +
+        '}';
   }
 }
