@@ -1,4 +1,7 @@
 from trading_bot import Dispatcher, TradingBot
+from chart_utils import display_graph
+import mplfinance as mpf
+import numpy as np
 import time
 
 class TestDispatcher(Dispatcher):
@@ -8,6 +11,8 @@ class TestDispatcher(Dispatcher):
         self.pnl = pnl
         self.data = None
         self.tick = 0
+        self.buys = []
+        self.sells = []
 
     def print_status(self):
         print("Balance: %f\nPositions: %s\nPnL: %f" % (self.balance, str(self.positions), self.pnl))
@@ -48,11 +53,11 @@ class TestDispatcher(Dispatcher):
         print("")
     
     def current_ask_price(self, pair):
-        index = min(self.tick + 1, self.data['open'].size - 1)
+        index = min(self.tick-1, self.data['open'].size - 1)
         return self.data.iloc[index]['open']
 
     def current_bid_price(self, pair):
-        index = min(self.tick + 1, self.data['open'].size - 1)
+        index = min(self.tick-1, self.data['open'].size - 1)
         return self.data.iloc[index]['open']
 
     def get_ohlc_data(self, kraken):
@@ -60,14 +65,15 @@ class TestDispatcher(Dispatcher):
             # OHLC is sorted so that the latest element is at OHLC.iloc[-1]
             ohlc, _ = kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
             self.data = ohlc
-            self.tick = 3
+            self.tick = 2
         
         if self.tick >= self.data['open'].size:
             print("----- Test complete -----")
             time.sleep(10)
+
         self.tick += 1
             
-        return self.data.iloc[:self.tick-1]
+        return self.data.iloc[:self.tick]
 
 def TestTradingBot():
     test_dispatcher = TestDispatcher(balance=1000, positions={"ADAEUR": []})
@@ -81,3 +87,6 @@ if __name__ == "__main__":
         test_bot.strategy_1()
     except KeyboardInterrupt:
         print("Done")
+        display_graph(test_bot.dispatcher.data, 200,
+            mpf.make_addplot(test_bot.dispatcher.buys[-200:], type='scatter', markersize=100, marker='*', color='g'),
+            mpf.make_addplot(test_bot.dispatcher.sells[-200:], type='scatter', markersize=100, marker='*', color='r'))
