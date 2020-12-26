@@ -1,8 +1,10 @@
 from trading_bot import Dispatcher, TradingBot
-from chart_utils import display_graph
+from chart_utils import display_graph, chart_signals
 import mplfinance as mpf
 import numpy as np
 import time
+
+from indicators import *
 
 class TestDispatcher(Dispatcher):
     def __init__(self, balance=0, positions=dict(), pnl=0):
@@ -22,10 +24,13 @@ class TestDispatcher(Dispatcher):
         #ask = ticker_info['a'][pair][0]
         ask = price
 
+        if amount <= 0:
+            return
         if self.balance >= amount * ask:
             print("Buying %f %s at price %f" % (amount, pair, ask))
             self.balance -= amount * ask
             self.positions[pair].append({'amount': amount, 'price': ask})
+            self.buys[-1] = ask
         else:
             print("Balance too low to buy %f %s at price %f" % (amount, pair, ask))
         self.print_status()
@@ -42,6 +47,7 @@ class TestDispatcher(Dispatcher):
             self.balance += position['amount'] * bid
             self.pnl += position['amount'] * (bid - position['price'])
             self.positions[pair].remove(position)
+            self.sells[-1] = bid
         else:
             if position is None:
                 while len(self.positions[pair]) > 0:
@@ -72,6 +78,9 @@ class TestDispatcher(Dispatcher):
             time.sleep(10)
 
         self.tick += 1
+
+        self.buys.append(np.nan)
+        self.sells.append(np.nan)
             
         return self.data.iloc[:self.tick]
 
@@ -84,9 +93,16 @@ def TestTradingBot():
 if __name__ == "__main__":
     test_bot = TestTradingBot()
     try:
-        test_bot.strategy_1()
+        test_bot.strategy_1(ema_crosses_higher_lower_sma_signal)
     except KeyboardInterrupt:
         print("Done")
+        buy, sell = chart_signals(test_bot.dispatcher.data, ema_crosses_higher_lower_sma_signal, SMA)
+        ohlc = test_bot.dispatcher.data
         display_graph(test_bot.dispatcher.data, 200,
             mpf.make_addplot(test_bot.dispatcher.buys[-200:], type='scatter', markersize=100, marker='*', color='g'),
-            mpf.make_addplot(test_bot.dispatcher.sells[-200:], type='scatter', markersize=100, marker='*', color='r'))
+            mpf.make_addplot(test_bot.dispatcher.sells[-200:], type='scatter', markersize=100, marker='*', color='r'),
+            mpf.make_addplot(buy[-200:], type='scatter', markersize=100, marker='^'),
+            mpf.make_addplot(sell[-200:], type='scatter', markersize=100, marker='v'),
+            mpf.make_addplot(ohlc['high'].rolling(40).mean()[-200:]),
+            mpf.make_addplot(ohlc['low'].rolling(40).mean()[-200:]),
+            mpf.make_addplot(ohlc['low'].ewm(span=15).mean()[-200:]))
