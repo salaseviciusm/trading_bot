@@ -30,16 +30,9 @@ def chart_signals(ohlc, signal_func, value_func):
 
 
 def display_graph(ohlc, r, *addplots):
-    buy, sell = chart_signals(ohlc, sma_signal, SMA)
-
-    added_plots = [
-        mpf.make_addplot(ohlc['close'].rolling(20).mean()[-r:]), # SMA line
-        mpf.make_addplot(buy[-r:], type='scatter', markersize=50, marker='^'), # SMA Buy Signals
-        mpf.make_addplot(sell[-r:], type='scatter', markersize=50, marker='v') # SMA Sell Signals
-    ]
-
+    added_plots = []
     if addplots is not None:
-        added_plots.extend(addplots)
+        added_plots = list(addplots)
 
     mpf.plot(ohlc.iloc[-r:], type='candlestick', addplot=added_plots)
     mpf.show()
