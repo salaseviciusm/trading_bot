@@ -48,11 +48,10 @@ def higher_lower_sma_signal(ohlc):
 def ema_crosses_higher_lower_sma_signal(ohlc):
     high_sma = SMA(ohlc['high'], 30)
     low_sma = SMA(ohlc['low'], 30)
-
-    prev_candle = ohlc.iloc[-2]
-    if EMA(ohlc['high'], 15) > high_sma:
+    
+    if EMA(ohlc['high'], 15) > low_sma:
         return Signal.BUY
-    if EMA(ohlc['low'], 15) < low_sma:
+    if EMA(ohlc['low'], 15) < high_sma:
         return Signal.SELL
     return Signal.HOLD
 
@@ -101,4 +100,41 @@ def stochastic_oscillator_signal(ohlc, kperiod=14, dperiod=3):
         if k.iloc[-1] < d:
             return Signal.SELL
 
+    return Signal.HOLD
+
+def RSI(ohlc, period):
+    # rsi = 100 - [100 / (1 + (avg price up / avg price down))]
+
+    deltas           =  ohlc['close'].diff()
+    seed             =  deltas[-period:]
+    up               =  seed[seed >= 0].sum() / period
+    down             = -seed[seed <  0].sum() / period
+    rs               =  up / down if down != 0 else 0
+
+    # # Smoothing values
+    # for i in range(period, ohlc['open'].size):
+    #     delta = deltas[i]
+
+    #     if  delta   >  0:
+    #         upval   =  delta
+    #         downval =  0.
+    #     else:
+    #         upval   =  0.
+    #         downval = -delta
+
+    #     up   = ( up   * ( period - 1 ) + upval   ) / period
+    #     down = ( down * ( period - 1 ) + downval ) / period
+
+    #     rs      = up / down
+
+    #     rsi[i]  = 100. - ( 100. / ( 1. + rs ) )
+
+    return 100 - (100 / (1 + rs))
+    
+def RSI_signal(ohlc, period=14):
+    rsi = RSI(ohlc, period)
+    if rsi > 70:
+        return Signal.SELL
+    elif rsi < 30:
+        return Signal.BUY
     return Signal.HOLD
