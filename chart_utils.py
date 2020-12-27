@@ -16,15 +16,12 @@ def chart_signals(ohlc, signal_func, value_func):
 
     for i in range(1, ohlc['open'].size):
         signal = signal_func(ohlc[:i+1])
+        buy.append(np.nan)
+        sell.append(np.nan)
         if signal == Signal.BUY:
-            buy.append(value_func(ohlc[:i+1]['close']))
-            sell.append(np.nan)
+            buy[-1] = value_func(ohlc[:i+1])
         elif signal == Signal.SELL:
-            buy.append(np.nan)
-            sell.append(value_func(ohlc[:i+1]['close']))
-        else:
-            buy.append(np.nan)
-            sell.append(np.nan)
+            sell[-1]= value_func(ohlc[:i+1])
 
     return buy, sell
 
