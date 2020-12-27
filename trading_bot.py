@@ -24,51 +24,52 @@ class Dispatcher(ABC):
     def current_bid_price(self, pair):
         raise NotImplementedError
 
-    def get_ohlc_data(self, kraken):
+    def get_ohlc_data(self):
+        raise NotImplementedError
+
+    def update(self):
         raise NotImplementedError
 
 class TradingBot:
     def __init__(self, dispatcher):
-        self.api = krakenex.API()
-        self.api.load_key('kraken.key')
-
-        self.kraken = KrakenAPI(self.api)
-
         self.dispatcher = dispatcher
 
     def strategy_1 (self, signal_func):
         while(True):
-            ohlc = self.dispatcher.get_ohlc_data(self.kraken)
+            self.dispatcher.update()
+            ohlc = self.dispatcher.get_ohlc_data()
             
             curr_candle = ohlc.iloc[-1]
 
             signal = signal_func(ohlc[:-1])
 
-            curr_ask = self.dispatcher.current_ask_price("ADAEUR")
-            curr_bid = self.dispatcher.current_bid_price("ADAEUR")
-
             if signal == Signal.BUY:
                 if isGreen(curr_candle):
+                    curr_ask = self.dispatcher.current_ask_price("ADAEUR")
                     self.dispatcher.buy("ADAEUR", int(self.dispatcher.balance / curr_ask), curr_ask)
             elif signal == Signal.SELL:
                 if isRed(curr_candle):
+                    curr_bid = self.dispatcher.current_bid_price("ADAEUR")
                     self.dispatcher.sell("ADAEUR", curr_bid)
     
     def strategy_2 (self):
         while(True):
-            ohlc = self.dispatcher.get_ohlc_data(self.kraken)
+            self.dispatcher.update()
+            ohlc = self.dispatcher.get_ohlc_data()
             
             curr_candle = ohlc.iloc[-1]
 
             signal = ema_crosses_higher_lower_sma_signal(ohlc[:-1])
             stoch_signal = stochastic_oscillator_signal(ohlc[:-1], 14, 3)
+            rsi = RSI(ohlc[:-1], 14)
 
-            curr_ask = self.dispatcher.current_ask_price("ADAEUR")
-            curr_bid = self.dispatcher.current_bid_price("ADAEUR")
-
-            if signal == Signal.BUY and stoch_signal != Signal.SELL:
+            if signal == Signal.BUY and stoch_signal != Signal.SELL and (EMA(ohlc['low'], 14) > EMA(ohlc['low'],100) or rsi < 30):
+                print("Buy!")
+                curr_ask = self.dispatcher.current_ask_price("ADAEUR")
                 self.dispatcher.buy("ADAEUR", int(self.dispatcher.balance / curr_ask), curr_ask)
             elif signal == Signal.SELL and stoch_signal != Signal.BUY:
+                print("Sell!")
+                curr_bid = self.dispatcher.current_bid_price("ADAEUR")
                 self.dispatcher.sell("ADAEUR", curr_bid)
 
 
