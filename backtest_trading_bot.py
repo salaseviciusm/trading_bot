@@ -15,7 +15,7 @@ class TestDispatcher(Dispatcher):
         self.balance = balance
         self.positions = positions
         self.pnl = pnl
-        self.data = None
+        self.data = {}
         self.tick = 0
         self.buys = []
         self.sells = []
@@ -40,7 +40,12 @@ class TestDispatcher(Dispatcher):
         if self.balance >= amount * ask:
             print("Buying %f %s at price %f" % (amount, pair, ask))
             self.balance -= amount * ask
-            self.positions[pair].append({'amount': amount, 'price': ask, 'stoploss': ask*0.99})
+            
+            order = {'amount': amount, 'price': ask, 'stoploss': ask*0.99}
+            if pair in self.positions:
+                self.positions[pair].append(order)
+            else:
+                self.positions[pair] = [order]
             self.buys[-1] = ask
 
             self.print_status()
@@ -54,7 +59,7 @@ class TestDispatcher(Dispatcher):
         #bid = ticker_info['b'][pair][0]
         bid = price
 
-        if position in self.positions[pair]:
+        if pair in self.positions and position in self.positions[pair]:
             print("Selling %f %s at price %f" % (position['amount'], pair, bid))
             self.balance += position['amount'] * bid
 
@@ -64,6 +69,8 @@ class TestDispatcher(Dispatcher):
 
             self.pnl += profit
             self.positions[pair].remove(position)
+            if len(self.positions[pair]) == 0:
+                del self.positions[pair]
             self.sells[-1] = bid
             self.trades += 1
 
@@ -71,30 +78,30 @@ class TestDispatcher(Dispatcher):
             print("")
         else:
             if position is None:
-                while len(self.positions[pair]) > 0:
+                while pair in self.positions and len(self.positions[pair]) > 0:
                     self.sell(pair, price, self.positions[pair][0])
             else:
                 print("This position does not exist.")
     
     def current_ask_price(self, pair):
-        index = min(self.tick-1, self.data['open'].size - 1)
-        return self.data.iloc[index]['open']
+        index = min(self.tick-1, len(self.data[pair]) - 1)
+        return self.data[pair].iloc[index]['open']
 
     def current_bid_price(self, pair):
-        index = min(self.tick-1, self.data['open'].size - 1)
-        return self.data.iloc[index]['open']
+        index = min(self.tick-1, len(self.data[pair]) - 1)
+        return self.data[pair].iloc[index]['open']
 
-    def get_ohlc_data(self):
-        if self.data is None:
+    def get_ohlc_data(self, pair):
+        if pair not in self.data:
             # OHLC is sorted so that the latest element is at OHLC.iloc[-1]
             #ohlc, _ = self.kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
-            ohlc = pd.read_csv('backtest_data/ADAEUR_5.csv', names=['time', 'open', 'high', 'low', 'close', 'volume', 'count'])
+            ohlc = pd.read_csv('backtest_data/%s_5.csv' % (pair), names=['time', 'open', 'high', 'low', 'close', 'volume', 'count'])
             ohlc['dtime'] = pd.to_datetime(ohlc.time, unit='s')
             ohlc.sort_values('dtime', ascending=True, inplace=True)
             ohlc.set_index('dtime', inplace=True)
-            self.data = ohlc
+            self.data[pair] = ohlc
         
-        if self.tick >= self.data['open'].size:
+        if self.tick >= len(self.data[pair].index):
             print("----- Test complete -----")
             print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
             % (test_bot.dispatcher.trades,
@@ -104,7 +111,7 @@ class TestDispatcher(Dispatcher):
                "up" if test_bot.dispatcher.pnl > 0 else "down"))
             time.sleep(10)
             
-        return self.data.iloc[:self.tick]
+        return self.data[pair].iloc[:self.tick]
     
     def update(self):
         self.tick += 1
@@ -112,17 +119,18 @@ class TestDispatcher(Dispatcher):
         self.buys.append(np.nan)
         self.sells.append(np.nan)
         
-        if self.data is not None:
-            for pair in self.positions:
+        for pair in self.data:
+            if pair in self.positions:
+                positions = self.positions[pair]
                 bid = self.current_bid_price(pair)
-                for position in self.positions[pair]:
+                for position in positions:
                     if position['stoploss'] >= bid:
                         print("Stoploss activated for %s" % (str(position)))
                         self.sell(pair, bid, position)
 
 def TestTradingBot():
-    test_dispatcher = TestDispatcher(balance=1000, positions={"ADAEUR": []})
-    test_bot = TradingBot(test_dispatcher)
+    test_dispatcher = TestDispatcher(balance=1000)
+    test_bot = TradingBot(test_dispatcher, pairs=['BCHGBP'])
 
     return test_bot
 

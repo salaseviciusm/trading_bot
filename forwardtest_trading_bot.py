@@ -13,7 +13,7 @@ from indicators import *
 class TestDispatcher(Dispatcher):
     def __init__(self, balance=0, positions=dict(), pnl=0, interval=5):
         self.interval = interval
-        self.data = None
+        self.data = {}
         self.last = None
 
         self.balance = balance
@@ -92,32 +92,33 @@ class TestDispatcher(Dispatcher):
     def current_bid_price(self, pair):
         return float(self.kraken.get_ticker_information(pair)['b'][pair][0])
 
-    def get_ohlc_data(self):
-        if self.data is None:
+    def get_ohlc_data(self, pair):
+        if pair not in self.data:
             # OHLC is sorted so that the latest element is at OHLC.iloc[-1]
-            ohlc, last = self.kraken.get_ohlc_data("ADAEUR", interval=self.interval, ascending=True)
-            self.data = ohlc
+            ohlc, last = self.kraken.get_ohlc_data(pair, interval=self.interval, ascending=True)
+            self.data[pair] = ohlc
             self.last = last
         else:
-            ohlc, last = self.kraken.get_ohlc_data("ADAEUR", interval=self.interval, ascending=True, since=self.last)
-            if ohlc['open'].size > 1:
-                self.data.iloc[-1] = ohlc.iloc[0]
-                self.data = self.data.append(ohlc.iloc[1:])
+            ohlc, last = self.kraken.get_ohlc_data(pair, interval=self.interval, ascending=True, since=self.last)
+            if len(ohlc.index) > 1:
+                self.data[pair].iloc[-1] = ohlc.iloc[0]
+                self.data[pair] = self.data[pair].append(ohlc.iloc[1:])
                 self.last = last
 
-        if self.data['open'].size > 800:
-            self.data = self.data[-750:]
+        if len(self.data[pair].index) > 800:
+            self.data[pair] = self.data[pair].iloc[-750:]
             
-        return self.data
+        return self.data[pair]
     
     def update(self):
+        time.sleep(5)
         self.buys.append(np.nan)
         self.sells.append(np.nan)
         
-        if self.data is not None:
-            for pair in self.positions.keys():
-                bid = self.current_bid_price(pair)
+        for pair in self.data:
+            if pair in self.positions:
                 positions = self.positions[pair]
+                bid = self.current_bid_price(pair)
                 for position in positions:
                     if position['stoploss'] >= bid:
                         print("Stoploss activated for %s" % (str(position)))
@@ -125,7 +126,7 @@ class TestDispatcher(Dispatcher):
 
 def TestTradingBot():
     test_dispatcher = TestDispatcher(balance=1000, interval=1)
-    test_bot = TradingBot(test_dispatcher)
+    test_bot = TradingBot(test_dispatcher, pairs=['BCHGBP'])
 
     return test_bot
 
@@ -136,10 +137,17 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Done")
 
-        r = 700
+        print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
+            % (test_bot.dispatcher.trades,
+               test_bot.dispatcher.winning_trades,
+               100*test_bot.dispatcher.winning_trades/test_bot.dispatcher.trades if test_bot.dispatcher.trades > 0 else 0,
+               100*(test_bot.dispatcher.pnl/1000),
+               "up" if test_bot.dispatcher.pnl > 0 else "down"))
 
         buy1, sell1 = chart_signals(test_bot.dispatcher.data, stochastic_oscillator_signal, stochastic_oscillator)
         ohlc = test_bot.dispatcher.data
+
+        r = min(len(ohlc.index), len(test_bot.dispatcher.buys))
 
         stochastic_line = []
         for i in range(1,ohlc['open'].size+1):
@@ -174,10 +182,3 @@ if __name__ == "__main__":
             mpf.make_addplot(pd.Series(70, index=range(r)), panel=2, secondary_y=False, color='black'),
             mpf.make_addplot(pd.Series(30, index=range(r)), panel=2, secondary_y=False, color='black')
             )
-
-        print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
-            % (test_bot.dispatcher.trades,
-               test_bot.dispatcher.winning_trades,
-               100*test_bot.dispatcher.winning_trades/test_bot.dispatcher.trades,
-               100*(test_bot.dispatcher.pnl/1000),
-               "up" if test_bot.dispatcher.pnl > 0 else "down"))
