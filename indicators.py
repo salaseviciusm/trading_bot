@@ -1,5 +1,6 @@
 from candlestick import isGreen, isRed
 import pandas as pd
+import numpy as np
 
 class Signal:
     BUY = 0
@@ -7,9 +8,13 @@ class Signal:
     HOLD = 2
 
 def SMA(data, periods=20):
+    if len(data.index) == 0:
+        return np.nan
     return data.rolling(periods).mean().iloc[-1]
 
 def EMA(data, periods=20):
+    if len(data.index) == 0:
+        return np.nan
     return data.ewm(span=periods).mean().iloc[-1]
 
 def has_crossed_value(ohlc_candle, target_value):
@@ -20,6 +25,9 @@ def sma_signal(ohlc):
     """ Returns a Signal for the last candlestick in the ohlc data frame.
         * ohlc must have at least 2 elements
     """
+    if len(ohlc.index) < 2:
+        return Signal.HOLD
+
     prev_candle = ohlc.iloc[-2]
     curr_candle = ohlc.iloc[-1]
     if has_crossed_value(prev_candle, SMA(ohlc.iloc[:-1]['close'])):
@@ -34,6 +42,9 @@ def higher_lower_sma_signal(ohlc):
         SELL if candle is completely below lower moving average,
         and HOLD in all other cases
     """
+    if len(ohlc.index) < 2:
+        return Signal.HOLD
+
     high_sma = SMA(ohlc['high'], 40)
     low_sma = SMA(ohlc['low'], 40)
 
@@ -59,6 +70,9 @@ def stochastic_oscillator(ohlc, period=14):
     """
     Returns the value of K% for the latest candle in ohlc based on the given period
     """
+    if len(ohlc.index) == 0:
+        return np.nan
+
     p = min(ohlc['low'].size, period)
 
     # Lowest low in the period
@@ -72,7 +86,7 @@ def stochastic_oscillator(ohlc, period=14):
     return k
 
 def close(ohlc):
-    return ohlc.iloc[-1]['close']
+    return ohlc.iloc[-1]['close'] if len(ohlc.index) > 0 else np.nan
 
 def stochastic_oscillator_signal(ohlc, kperiod=14, dperiod=3):
     """
@@ -81,7 +95,7 @@ def stochastic_oscillator_signal(ohlc, kperiod=14, dperiod=3):
     Returns BUY when there are oversold conditions and the K line crosses above the D line
     """
 
-    if ohlc['close'].size < max(kperiod, dperiod):
+    if len(ohlc.index) < max(kperiod, dperiod):
         return Signal.HOLD
 
     kvals = []
@@ -104,6 +118,8 @@ def stochastic_oscillator_signal(ohlc, kperiod=14, dperiod=3):
 
 def RSI(ohlc, period):
     # rsi = 100 - [100 / (1 + (avg price up / avg price down))]
+    if len(ohlc.index) == 0:
+        return np.nan
 
     deltas           =  ohlc['close'].diff()
     seed             =  deltas[-period:]
