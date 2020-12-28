@@ -17,8 +17,8 @@ class TestDispatcher(Dispatcher):
         self.pnl = pnl
         self.data = {}
         self.tick = 0
-        self.buys = []
-        self.sells = []
+        self.buys = {}
+        self.sells = {}
         self.winning_trades = 0
         self.trades = 0
 
@@ -46,7 +46,7 @@ class TestDispatcher(Dispatcher):
                 self.positions[pair].append(order)
             else:
                 self.positions[pair] = [order]
-            self.buys[-1] = ask
+            self.buys[pair][-1] = ask
 
             self.print_status()
             print("")
@@ -71,7 +71,7 @@ class TestDispatcher(Dispatcher):
             self.positions[pair].remove(position)
             if len(self.positions[pair]) == 0:
                 del self.positions[pair]
-            self.sells[-1] = bid
+            self.sells[pair][-1] = bid
             self.trades += 1
 
             self.print_status()
@@ -84,11 +84,11 @@ class TestDispatcher(Dispatcher):
                 print("This position does not exist.")
     
     def current_ask_price(self, pair):
-        index = min(self.tick-1, len(self.data[pair]) - 1)
+        index = min(self.tick-1, len(self.data[pair].index) - 1)
         return self.data[pair].iloc[index]['open']
 
     def current_bid_price(self, pair):
-        index = min(self.tick-1, len(self.data[pair]) - 1)
+        index = min(self.tick-1, len(self.data[pair].index) - 1)
         return self.data[pair].iloc[index]['open']
 
     def get_ohlc_data(self, pair):
@@ -100,25 +100,18 @@ class TestDispatcher(Dispatcher):
             ohlc.sort_values('dtime', ascending=True, inplace=True)
             ohlc.set_index('dtime', inplace=True)
             self.data[pair] = ohlc
+            self.buys[pair] = []
+            self.sells[pair] = []
         
-        if self.tick >= len(self.data[pair].index):
-            print("----- Test complete -----")
-            print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
-            % (test_bot.dispatcher.trades,
-               test_bot.dispatcher.winning_trades,
-               100*test_bot.dispatcher.winning_trades/test_bot.dispatcher.trades,
-               100*(test_bot.dispatcher.pnl/1000),
-               "up" if test_bot.dispatcher.pnl > 0 else "down"))
-            time.sleep(10)
+        self.buys[pair].append(np.nan)
+        self.sells[pair].append(np.nan)
             
         return self.data[pair].iloc[:self.tick]
     
     def update(self):
         self.tick += 1
-
-        self.buys.append(np.nan)
-        self.sells.append(np.nan)
         
+        finished = True
         for pair in self.data:
             if pair in self.positions:
                 positions = self.positions[pair]
@@ -127,6 +120,19 @@ class TestDispatcher(Dispatcher):
                     if position['stoploss'] >= bid:
                         print("Stoploss activated for %s" % (str(position)))
                         self.sell(pair, bid, position)
+            
+            if self.tick < len(self.data[pair].index):
+                finished = False
+        
+        if finished and len(self.data) > 0:
+            print("----- Test complete -----")
+            print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
+            % (test_bot.dispatcher.trades,
+            test_bot.dispatcher.winning_trades,
+            100*test_bot.dispatcher.winning_trades/test_bot.dispatcher.trades,
+            100*(test_bot.dispatcher.pnl/1000),
+            "up" if test_bot.dispatcher.pnl > 0 else "down"))
+            time.sleep(10)
 
 def TestTradingBot():
     test_dispatcher = TestDispatcher(balance=1000)

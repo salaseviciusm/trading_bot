@@ -20,8 +20,8 @@ class TestDispatcher(Dispatcher):
         self.positions = positions
         self.pnl = pnl
 
-        self.buys = []
-        self.sells = []
+        self.buys = {}
+        self.sells = {}
         self.winning_trades = 0
         self.trades = 0
 
@@ -49,7 +49,7 @@ class TestDispatcher(Dispatcher):
                 self.positions[pair].append(order)
             else:
                 self.positions[pair] = [order]
-            self.buys[-1] = ask
+            self.buys[pair][-1] = ask
 
             self.print_status()
             print("")
@@ -74,7 +74,7 @@ class TestDispatcher(Dispatcher):
             self.positions[pair].remove(position)
             if len(self.positions[pair]) == 0:
                 del self.positions[pair]
-            self.sells[-1] = bid
+            self.sells[pair][-1] = bid
             self.trades += 1
 
             self.print_status()
@@ -98,12 +98,18 @@ class TestDispatcher(Dispatcher):
             ohlc, last = self.kraken.get_ohlc_data(pair, interval=self.interval, ascending=True)
             self.data[pair] = ohlc
             self.last = last
+            self.buys[pair] = [np.nan]
+            self.sells[pair] = [np.nan]
         else:
             ohlc, last = self.kraken.get_ohlc_data(pair, interval=self.interval, ascending=True, since=self.last)
             if len(ohlc.index) > 1:
                 self.data[pair].iloc[-1] = ohlc.iloc[0]
                 self.data[pair] = self.data[pair].append(ohlc.iloc[1:])
                 self.last = last
+            
+            extension = [np.nan for i in range(len(ohlc.index))]
+            self.buys[pair].extend(extension)
+            self.sells[pair].extend(extension)
 
         if len(self.data[pair].index) > 800:
             self.data[pair] = self.data[pair].iloc[-750:]
@@ -112,8 +118,6 @@ class TestDispatcher(Dispatcher):
     
     def update(self):
         time.sleep(5)
-        self.buys.append(np.nan)
-        self.sells.append(np.nan)
         
         for pair in self.data:
             if pair in self.positions:
