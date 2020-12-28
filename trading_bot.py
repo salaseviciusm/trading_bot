@@ -12,6 +12,13 @@ from chart_utils import chart_signals, display_graph
 from indicators import *
 
 class Dispatcher(ABC):
+    """
+    Abstract class that the bot will use for retrieving price data and buy/sell orders
+    in the way that child classes decide to implement this class.
+    Deriving classes could, for example, be used to create dispatchers for different
+    exchanges, as well as for testing strategies.
+    """
+
     def buy(self, pair, amount, price):
         raise NotImplementedError
 
@@ -24,53 +31,59 @@ class Dispatcher(ABC):
     def current_bid_price(self, pair):
         raise NotImplementedError
 
-    def get_ohlc_data(self):
+    def get_ohlc_data(self, pair):
         raise NotImplementedError
-
+    
+    # Used to update the state of the dispatcher once each cycle
     def update(self):
         raise NotImplementedError
 
 class TradingBot:
-    def __init__(self, dispatcher):
+    def __init__(self, dispatcher, pairs=[]):
         self.dispatcher = dispatcher
+        self.pairs = pairs
 
-    def strategy_1 (self, signal_func):
+    def strategy_1 (self, signal_func, signal_func_args={}):
         while(True):
             self.dispatcher.update()
-            ohlc = self.dispatcher.get_ohlc_data()
-            
-            curr_candle = ohlc.iloc[-1]
 
-            signal = signal_func(ohlc[:-1])
+            for pair in self.pairs:
+                ohlc = self.dispatcher.get_ohlc_data(pair)
+                
+                curr_candle = ohlc.iloc[-1]
 
-            if signal == Signal.BUY:
-                if isGreen(curr_candle):
-                    curr_ask = self.dispatcher.current_ask_price("ADAEUR")
-                    self.dispatcher.buy("ADAEUR", int(self.dispatcher.balance / curr_ask), curr_ask)
-            elif signal == Signal.SELL:
-                if isRed(curr_candle):
-                    curr_bid = self.dispatcher.current_bid_price("ADAEUR")
-                    self.dispatcher.sell("ADAEUR", curr_bid)
+                signal = signal_func(ohlc[:-1], **signal_func_args)
+
+                if signal == Signal.BUY:
+                    if isGreen(curr_candle):
+                        curr_ask = self.dispatcher.current_ask_price(pair)
+                        self.dispatcher.buy(pair, int(self.dispatcher.balance / curr_ask), curr_ask)
+                elif signal == Signal.SELL:
+                    if isRed(curr_candle):
+                        curr_bid = self.dispatcher.current_bid_price(pair)
+                        self.dispatcher.sell(pair, curr_bid)
     
     def strategy_2 (self):
         while(True):
             self.dispatcher.update()
-            ohlc = self.dispatcher.get_ohlc_data()
-            
-            curr_candle = ohlc.iloc[-1]
 
-            signal = ema_crosses_higher_lower_sma_signal(ohlc[:-1])
-            stoch_signal = stochastic_oscillator_signal(ohlc[:-1], 14, 3)
-            rsi = RSI(ohlc[:-1], 14)
+            for pair in self.pairs:
+                ohlc = self.dispatcher.get_ohlc_data(pair)
+                
+                curr_candle = ohlc.iloc[-1]
 
-            if signal == Signal.BUY and stoch_signal != Signal.SELL and (EMA(ohlc['low'], 14) > EMA(ohlc['low'],100) or rsi < 30):
-                print("Buy!")
-                curr_ask = self.dispatcher.current_ask_price("ADAEUR")
-                self.dispatcher.buy("ADAEUR", int(self.dispatcher.balance / curr_ask), curr_ask)
-            elif signal == Signal.SELL and stoch_signal != Signal.BUY:
-                print("Sell!")
-                curr_bid = self.dispatcher.current_bid_price("ADAEUR")
-                self.dispatcher.sell("ADAEUR", curr_bid)
+                signal = ema_crosses_higher_lower_sma_signal(ohlc[:-1])
+                stoch_signal = stochastic_oscillator_signal(ohlc[:-1], kperiod=14, dperiod=3)
+                rsi = RSI(ohlc[:-1], 14)
+
+                if signal == Signal.BUY and stoch_signal != Signal.SELL and (EMA(ohlc['low'], 14) > EMA(ohlc['low'],100) or rsi < 30):
+                    #print("Buy!")
+                    curr_ask = self.dispatcher.current_ask_price(pair)
+                    self.dispatcher.buy(pair, int(self.dispatcher.balance / curr_ask), curr_ask)
+                elif signal == Signal.SELL and stoch_signal != Signal.BUY:
+                    #print("Sell!")
+                    curr_bid = self.dispatcher.current_bid_price(pair)
+                    self.dispatcher.sell(pair, curr_bid)
 
 
 if __name__ == "__main__":
@@ -79,13 +92,13 @@ if __name__ == "__main__":
     
     kraken = KrakenAPI(api)
 
-    ohlc, _ = kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
-
-    buy, sell = chart_signals(ohlc, stochastic_oscillator_signal, stochastic_oscillator)
-
     import matplotlib
     import mplfinance as mpf
     import pandas as pd
+
+    ohlc, _ = kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
+
+    buy, sell = chart_signals(ohlc, stochastic_oscillator_signal, stochastic_oscillator)
     
     stochastic_line = []
     for i in range(1,ohlc['open'].size+1):
