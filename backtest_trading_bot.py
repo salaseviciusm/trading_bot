@@ -85,21 +85,30 @@ class TestDispatcher(Dispatcher):
         return self.data.iloc[index]['open']
 
     def get_ohlc_data(self):
-        if self.tick == 0:
+        if self.data is None:
             # OHLC is sorted so that the latest element is at OHLC.iloc[-1]
-            ohlc, _ = self.kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
+            #ohlc, _ = self.kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
+            ohlc = pd.read_csv('backtest_data/ADAEUR_5.csv', names=['time', 'open', 'high', 'low', 'close', 'volume', 'count'])
+            ohlc['dtime'] = pd.to_datetime(ohlc.time, unit='s')
+            ohlc.sort_values('dtime', ascending=True, inplace=True)
+            ohlc.set_index('dtime', inplace=True)
             self.data = ohlc
-            self.tick = 2
-        
-        self.tick += 1
         
         if self.tick >= self.data['open'].size:
             print("----- Test complete -----")
+            print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
+            % (test_bot.dispatcher.trades,
+               test_bot.dispatcher.winning_trades,
+               100*test_bot.dispatcher.winning_trades/test_bot.dispatcher.trades,
+               100*(test_bot.dispatcher.pnl/1000),
+               "up" if test_bot.dispatcher.pnl > 0 else "down"))
             time.sleep(10)
             
         return self.data.iloc[:self.tick]
     
     def update(self):
+        self.tick += 1
+
         self.buys.append(np.nan)
         self.sells.append(np.nan)
         
@@ -124,10 +133,10 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Done")
 
-        r = 700
-
         buy1, sell1 = chart_signals(test_bot.dispatcher.data, stochastic_oscillator_signal, stochastic_oscillator)
         ohlc = test_bot.dispatcher.data
+
+        r = len(ohlc.index)
 
         stochastic_line = []
         for i in range(1,ohlc['open'].size+1):
@@ -146,12 +155,11 @@ if __name__ == "__main__":
             mpf.make_addplot(test_bot.dispatcher.sells[-r:], type='scatter', markersize=100, marker='*', color='r'),
             #mpf.make_addplot(buy[-r:], type='scatter', markersize=100, marker='^'),
             #mpf.make_addplot(sell[-r:], type='scatter', markersize=100, marker='v'),
-            mpf.make_addplot(ohlc['high'].rolling(30).mean()[-r:]),
-            mpf.make_addplot(ohlc['low'].rolling(30).mean()[-r:]),
-            mpf.make_addplot(ohlc['high'].ewm(span=100).mean()[-r:]),
-            mpf.make_addplot(ohlc['low'].ewm(span=100).mean()[-r:]),
-            mpf.make_addplot(ohlc['low'].ewm(span=14).mean()[-r:]),
-            mpf.make_addplot(ohlc['high'].ewm(span=14).mean()[-r:]),
+            mpf.make_addplot(ohlc['high'].rolling(30).mean()[-r:], color='y'),
+            mpf.make_addplot(ohlc['low'].rolling(30).mean()[-r:], color='m'),
+            mpf.make_addplot(ohlc['low'].ewm(span=100).mean()[-r:], color='r'),
+            mpf.make_addplot(ohlc['low'].ewm(span=14).mean()[-r:], color='b'),
+            mpf.make_addplot(ohlc['high'].ewm(span=14).mean()[-r:], color='g'),
             mpf.make_addplot(buy1[-r:], type='scatter', markersize=100, marker='*', color='g', secondary_y=False, panel=1),
             mpf.make_addplot(sell1[-r:], type='scatter', markersize=100, marker='*', color='r', secondary_y=False, panel=1),
             mpf.make_addplot(stochastic_line[-r:], panel=1, secondary_y=False),
@@ -162,10 +170,3 @@ if __name__ == "__main__":
             mpf.make_addplot(pd.Series(70, index=range(r)), panel=2, secondary_y=False, color='black'),
             mpf.make_addplot(pd.Series(30, index=range(r)), panel=2, secondary_y=False, color='black')
             )
-
-        print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
-            % (test_bot.dispatcher.trades,
-               test_bot.dispatcher.winning_trades,
-               100*test_bot.dispatcher.winning_trades/test_bot.dispatcher.trades,
-               100*(test_bot.dispatcher.pnl/1000),
-               "up" if test_bot.dispatcher.pnl > 0 else "down"))
