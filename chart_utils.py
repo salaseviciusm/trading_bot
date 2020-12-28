@@ -6,22 +6,22 @@ import numpy as np
 
 from indicators import Signal, SMA, EMA, sma_signal
 
-def chart_signals(ohlc, signal_func, value_func):
+def chart_signals(ohlc, signal_func, value_func, signal_func_args={}, value_func_args={}):
     """ Returns a series for the ohlc data that shows where the buy and sell signals are for
         the given signal_func(ohlc). These signals will be placed at the value given by
         value_func(ohlc).
     """
-    buy = [np.nan]
-    sell = [np.nan]
+    buy = [np.nan for i in range (len(ohlc.index))]
+    sell = buy.copy()
 
-    for i in range(1, ohlc['open'].size):
-        signal = signal_func(ohlc[:i+1])
-        buy.append(np.nan)
-        sell.append(np.nan)
+    for i in range(0, len(ohlc.index)):
+        signal = signal_func(ohlc.iloc[:i+1], **signal_func_args)
+        value = value_func(ohlc.iloc[:i+1], **value_func_args)
+
         if signal == Signal.BUY:
-            buy[-1] = value_func(ohlc[:i+1])
+            buy[i] = value
         elif signal == Signal.SELL:
-            sell[-1]= value_func(ohlc[:i+1])
+            sell[i]= value
 
     return buy, sell
 
