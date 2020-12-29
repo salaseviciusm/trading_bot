@@ -2,7 +2,7 @@ import krakenex
 from pykrakenapi import KrakenAPI
 
 from trading_bot import Dispatcher, TradingBot
-from chart_utils import display_graph, chart_signals
+from chart_utils import display_graph, chart_signals, h_line
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
@@ -102,9 +102,6 @@ class TestDispatcher(Dispatcher):
             self.data[pair] = ohlc
             self.buys[pair] = []
             self.sells[pair] = []
-        
-        self.buys[pair].append(np.nan)
-        self.sells[pair].append(np.nan)
             
         return self.data[pair].iloc[:self.tick]
     
@@ -113,6 +110,9 @@ class TestDispatcher(Dispatcher):
         
         finished = True
         for pair in self.data:
+            self.buys[pair].append(np.nan)
+            self.sells[pair].append(np.nan)
+
             if pair in self.positions:
                 positions = self.positions[pair]
                 bid = self.current_bid_price(pair)
@@ -121,7 +121,7 @@ class TestDispatcher(Dispatcher):
                         print("Stoploss activated for %s" % (str(position)))
                         self.sell(pair, bid, position)
             
-            if self.tick < len(self.data[pair].index):
+            if self.tick <= len(self.data[pair].index):
                 finished = False
         
         if finished and len(self.data) > 0:
@@ -147,40 +147,31 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Done")
 
-        buy1, sell1 = chart_signals(test_bot.dispatcher.data, stochastic_oscillator_signal, stochastic_oscillator)
-        ohlc = test_bot.dispatcher.data
-
-        r = len(ohlc.index)
-
-        stochastic_line = []
-        for i in range(1,ohlc['open'].size+1):
-            stochastic_line.append(stochastic_oscillator(ohlc.iloc[:i], 14))
-        stochastic_line = pd.Series(stochastic_line)
-
-        rsi_line = []
-        for i in range(1, ohlc['open'].size+1):
-            rsi_line.append(RSI(ohlc.iloc[:i], 14))
-        rsi_line = pd.Series(rsi_line)
-
-        buy, sell = chart_signals(test_bot.dispatcher.data, ema_crosses_higher_lower_sma_signal, SMA)
-        ohlc = test_bot.dispatcher.data
-        display_graph(test_bot.dispatcher.data, r,
-            mpf.make_addplot(test_bot.dispatcher.buys[-r:], type='scatter', markersize=100, marker='*', color='g'),
-            mpf.make_addplot(test_bot.dispatcher.sells[-r:], type='scatter', markersize=100, marker='*', color='r'),
-            #mpf.make_addplot(buy[-r:], type='scatter', markersize=100, marker='^'),
-            #mpf.make_addplot(sell[-r:], type='scatter', markersize=100, marker='v'),
-            mpf.make_addplot(ohlc['high'].rolling(30).mean()[-r:], color='y'),
-            mpf.make_addplot(ohlc['low'].rolling(30).mean()[-r:], color='m'),
-            mpf.make_addplot(ohlc['low'].ewm(span=100).mean()[-r:], color='r'),
-            mpf.make_addplot(ohlc['low'].ewm(span=14).mean()[-r:], color='b'),
-            mpf.make_addplot(ohlc['high'].ewm(span=14).mean()[-r:], color='g'),
-            mpf.make_addplot(buy1[-r:], type='scatter', markersize=100, marker='*', color='g', secondary_y=False, panel=1),
-            mpf.make_addplot(sell1[-r:], type='scatter', markersize=100, marker='*', color='r', secondary_y=False, panel=1),
-            mpf.make_addplot(stochastic_line[-r:], panel=1, secondary_y=False),
-            mpf.make_addplot(stochastic_line.rolling(3).mean()[-r:], panel=1, secondary_y=False, marker='-'),
-            mpf.make_addplot(pd.Series(80, index=range(r)), panel=1, secondary_y=False, color='black'),
-            mpf.make_addplot(pd.Series(20, index=range(r)), panel=1, secondary_y=False, color='black'),
-            mpf.make_addplot(rsi_line.iloc[-r:], panel=2, secondary_y=False),
-            mpf.make_addplot(pd.Series(70, index=range(r)), panel=2, secondary_y=False, color='black'),
-            mpf.make_addplot(pd.Series(30, index=range(r)), panel=2, secondary_y=False, color='black')
-            )
+        for pair in test_bot.pairs:
+            ohlc = test_bot.dispatcher.data[pair]
+            print(len(ohlc.index))
+            print(len(test_bot.dispatcher.buys[pair]))
+            print(len(test_bot.dispatcher.sells[pair]))
+            
+            stoch_buy, stoch_sell, stoch_line = chart_signals(ohlc, stochastic_oscillator_signal, stochastic_oscillator)
+            rsi_buy, rsi_sell, rsi_line = chart_signals(ohlc, RSI_signal, RSI, value_f_args={'period':14})
+            #buy_ema, sell_ema, line_ema = chart_signals(ohlc, ema_crosses_higher_lower_sma_signal, SMA)
+            display_graph(ohlc, add_plots=
+            [
+                {'data': test_bot.dispatcher.buys[pair], 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g'},
+                {'data': test_bot.dispatcher.sells[pair], 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g'},
+                {'data': ohlc['high'].rolling(30).mean(), 'color':'y'},
+                {'data': ohlc['low'].rolling(30).mean(), 'color':'m'},
+                {'data': ohlc['high'].ewm(span=30).mean(), 'color':'b'},
+                {'data': ohlc['low'].ewm(span=30).mean(), 'color':'y'},
+                {'data': ohlc['low'].ewm(span=100).mean(), 'color':'r'},
+                {'data': stoch_buy, 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g', 'secondary_y':False, 'panel':1},
+                {'data': stoch_sell, 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g', 'secondary_y':False, 'panel':1},
+                {'data': stoch_line, 'panel':1, 'secondary_y':False},
+                {'data': stoch_line.rolling(3).mean(), 'panel':1, 'secondary_y':False},
+                {'data': h_line(80, len(ohlc.index)), 'panel':1, 'secondary_y':False, 'color':'black'},
+                {'data': h_line(20, len(ohlc.index)), 'panel':1, 'secondary_y':False, 'color':'black'},
+                {'data': rsi_line, 'panel':2, 'secondary_y':False},
+                {'data': h_line(70, len(ohlc.index)), 'panel':2, 'secondary_y':False, 'color':'black'},
+                {'data': h_line(30, len(ohlc.index)), 'panel':2, 'secondary_y':False, 'color':'black'},
+            ])

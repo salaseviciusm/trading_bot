@@ -8,8 +8,16 @@ from abc import ABC
 import time
 
 from candlestick import isRed, isGreen
-from chart_utils import chart_signals, display_graph
+from chart_utils import chart_signals, display_graph, h_line
 from indicators import *
+
+
+class DispatcherData():
+    """
+    A class that stores the Dispatcher's data, such as OHLC data and the buys/sells array for each pair
+    """
+    def __init__(self):
+        pass
 
 class Dispatcher(ABC):
     """
@@ -96,20 +104,19 @@ if __name__ == "__main__":
     import mplfinance as mpf
     import pandas as pd
 
+    ticker_info = kraken.get_ticker_information('ADAEUR,BCHGBP')
+    print(ticker_info)
+    input()
     ohlc, _ = kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
 
-    buy, sell = chart_signals(ohlc, stochastic_oscillator_signal, stochastic_oscillator)
-    
-    stochastic_line = []
-    for i in range(1,ohlc['open'].size+1):
-        stochastic_line.append(stochastic_oscillator(ohlc.iloc[:i], 14))
-    stochastic_line = pd.Series(stochastic_line)
+    buy, sell, line = chart_signals(ohlc, stochastic_oscillator_signal, stochastic_oscillator)
 
-    r = 400
-    display_graph(ohlc, r,
-        mpf.make_addplot(buy[-r:], type='scatter', markersize=100, marker='*', color='g', panel=1, secondary_y=False),
-        mpf.make_addplot(sell[-r:], type='scatter', markersize=100, marker='*', color='r', panel=1, secondary_y=False),
-        mpf.make_addplot(stochastic_line[-r:], panel=1, secondary_y=False),
-        mpf.make_addplot(stochastic_line.rolling(3).mean()[-r:], panel=1, secondary_y=False, marker='-'),
-        mpf.make_addplot(pd.Series(80, index=range(r)), panel=1, secondary_y=False, color='black'),
-        mpf.make_addplot(pd.Series(20, index=range(r)), panel=1, secondary_y=False, color='black'))
+    display_graph(ohlc, (400,),
+    [
+        {'data': buy, 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g', 'panel':1, 'secondary_y':False},
+        {'data': sell, 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'r', 'panel':1, 'secondary_y':False},
+        {'data': line, 'color':'C1', 'panel':1, 'secondary_y':False},
+        {'data': line.rolling(3).mean(), 'panel':1, 'secondary_y':False},
+        {'data': h_line(80, len(ohlc.index)), 'panel':1, 'secondary_y':False, 'color':'black'},
+        {'data': h_line(20, len(ohlc.index)), 'panel':1, 'secondary_y':False, 'color':'black'}
+    ])
