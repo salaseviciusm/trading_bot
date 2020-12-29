@@ -4,32 +4,51 @@ import mplfinance as mpf
 
 import numpy as np
 
+import pandas as pd
+
 from indicators import Signal, SMA, EMA, sma_signal
 
-def chart_signals(ohlc, signal_func, value_func, signal_func_args={}, value_func_args={}):
-    """ Returns a series for the ohlc data that shows where the buy and sell signals are for
-        the given signal_func(ohlc). These signals will be placed at the value given by
-        value_func(ohlc).
+def h_line(y, length):
+    """ Returns a pandas Series of size length which represents a horizontal line on the axis at value y=y
+    """
+    return pd.Series([y for i in range (length)])
+
+def chart_signals(ohlc, signal_f, value_f, signal_f_args={}, value_f_args={}):
+    """ Returns 3 lists:
+        * One representing a scatter where the bot sent each buy order
+        * One for sell orders
+          (Both based on signal_f() placed at value_f())
+        * One pandas Series representing the line for the signal indicator
     """
     buy = [np.nan for i in range (len(ohlc.index))]
     sell = buy.copy()
+    value_line = buy.copy()
 
     for i in range(0, len(ohlc.index)):
-        signal = signal_func(ohlc.iloc[:i+1], **signal_func_args)
-        value = value_func(ohlc.iloc[:i+1], **value_func_args)
+        signal = signal_f(ohlc.iloc[:i+1], **signal_f_args)
+        value = value_f(ohlc.iloc[:i+1], **value_f_args)
+
+        value_line[i] = value
 
         if signal == Signal.BUY:
             buy[i] = value
         elif signal == Signal.SELL:
             sell[i]= value
 
-    return buy, sell
+    return buy, sell, pd.Series(value_line)
 
 
-def display_graph(ohlc, r, *addplots):
+def display_graph(ohlc, view_range=(0,), add_plots=[]):
+    a = view_range[0]
+    b = view_range[1] if len(view_range) > 1 else len(ohlc.index)
+
     added_plots = []
-    if addplots is not None:
-        added_plots = list(addplots)
+    for plot in add_plots:
+        data = plot['data']
+        del plot['data']
+        print(data)
 
-    mpf.plot(ohlc.iloc[-r:], type='candlestick', addplot=added_plots)
+        added_plots.append(mpf.make_addplot(data[a:b], **plot))
+
+    mpf.plot(ohlc.iloc[a:b], type='candlestick', addplot=added_plots)
     mpf.show()
