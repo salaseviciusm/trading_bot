@@ -21,6 +21,7 @@ def chart_signals(ohlc, signal_f, value_f, signal_f_args={}, value_f_args={}):
         * One pandas Series representing the line for the signal indicator
     """
     buy = [np.nan for i in range (len(ohlc.index))]
+    buy[0] = 0 # Ensure that the entire list isn't NaN as this will prevent MPL from plotting it
     sell = buy.copy()
     value_line = buy.copy()
 
@@ -46,7 +47,6 @@ def display_graph(ohlc, view_range=(0,), add_plots=[]):
     for plot in add_plots:
         data = plot['data']
         del plot['data']
-        print(data)
 
         added_plots.append(mpf.make_addplot(data[a:b], **plot))
 

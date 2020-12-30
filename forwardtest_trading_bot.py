@@ -102,20 +102,23 @@ class TestDispatcher(Dispatcher):
             self.data[pair] = ohlc
             self.last = last
             self.buys[pair] = [np.nan for i in range(len(ohlc.index))]
-            self.sells[pair] = [np.nan]
+            self.buys[pair][0] = 0
+            self.sells[pair] = self.buys[pair].copy()
         else:
             ohlc, last = self.kraken.get_ohlc_data(pair, interval=self.interval, ascending=True, since=self.last)
             if len(ohlc.index) > 1:
                 self.data[pair].iloc[-1] = ohlc.iloc[0]
                 self.data[pair] = self.data[pair].append(ohlc.iloc[1:])
                 self.last = last
+            else:
+                self.data[pair].iloc[-1] = ohlc.iloc[0]
             
-            extension = [np.nan for i in range(len(ohlc.index))] if len(ohlc.index) > 1 else []
+            extension = [np.nan for i in range(len(ohlc.index)-1)]
             self.buys[pair].extend(extension)
             self.sells[pair].extend(extension)
 
-        if len(self.data[pair].index) > 800:
-            self.data[pair] = self.data[pair].iloc[-750:]
+        #if len(self.data[pair].index) > 800:
+        #    self.data[pair] = self.data[pair].iloc[-750:]
             
         return self.data[pair]
     
@@ -133,7 +136,7 @@ class TestDispatcher(Dispatcher):
                         self.sell(pair, bid, position)
 
 def TestTradingBot():
-    pairs = ['BCHGBP']
+    pairs = ['ADAEUR']
     test_dispatcher = TestDispatcher(balance=1000, interval=1, pairs=pairs)
     test_bot = TradingBot(test_dispatcher, pairs=pairs)
 
