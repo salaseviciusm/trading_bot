@@ -47,7 +47,7 @@ class TestDispatcher(Dispatcher):
             print("Buying %f %s at price %f" % (amount, pair, ask))
             self.balance -= amount * ask
 
-            order = {'amount': amount, 'price': ask, 'stoploss': ask*0.99}
+            order = {'amount': amount, 'price': ask, 'stoploss': ask*0.99, 'takeprofit': ask*1.02}
             if pair in self.positions:
                 self.positions[pair].append(order)
             else:
@@ -102,7 +102,7 @@ class TestDispatcher(Dispatcher):
             self.data[pair] = ohlc
             self.last = last
             self.buys[pair] = [np.nan for i in range(len(ohlc.index))]
-            self.buys[pair][0] = 0
+            self.buys[pair][0] = ohlc.iloc[0]['open']
             self.sells[pair] = self.buys[pair].copy()
         else:
             ohlc, last = self.kraken.get_ohlc_data(pair, interval=self.interval, ascending=True, since=self.last)
@@ -133,6 +133,9 @@ class TestDispatcher(Dispatcher):
                 for position in positions:
                     if position['stoploss'] >= bid:
                         print("Stoploss activated for %s" % (str(position)))
+                        self.sell(pair, bid, position)
+                    elif position['takeprofit'] <= bid:
+                        print("Takeprofit activated for %s" % (str(position)))
                         self.sell(pair, bid, position)
 
 def TestTradingBot():
@@ -167,8 +170,8 @@ if __name__ == "__main__":
             #buy_ema, sell_ema, line_ema = chart_signals(ohlc, ema_crosses_higher_lower_sma_signal, SMA)
             display_graph(ohlc, add_plots=
             [
-                {'data': test_bot.dispatcher.buys[pair], 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g'},
-                {'data': test_bot.dispatcher.sells[pair], 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g'},
+                {'data': test_bot.dispatcher.buys[pair], 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g', 'secondary_y':False},
+                {'data': test_bot.dispatcher.sells[pair], 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'r', 'secondary_y':False},
                 {'data': ohlc['high'].rolling(30).mean(), 'color':'y'},
                 {'data': ohlc['low'].rolling(30).mean(), 'color':'m'},
                 {'data': ohlc['high'].ewm(span=30).mean(), 'color':'b'},

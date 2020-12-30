@@ -39,7 +39,7 @@ def chart_signals(ohlc, signal_f, value_f, signal_f_args={}, value_f_args={}):
     return buy, sell, pd.Series(value_line)
 
 
-def display_graph(ohlc, view_range=(0,), add_plots=[]):
+def display_graph(ohlc, view_range=(1,), add_plots=[]):
     a = view_range[0]
     b = view_range[1] if len(view_range) > 1 else len(ohlc.index)
 
