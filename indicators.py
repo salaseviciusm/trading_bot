@@ -9,14 +9,12 @@ class Signal:
 
 def volatility(ohlc, periods=24*12):
     """ Calculate a custom measure for volatility.
-        Returns vol, where 0 <= vol <= 1- l^2/h^2, where
-        l is the lowest low, and h the highest high, in the
-        given period.
+        Returns vol, where 0 < vol <= 1
     """
     p = min(len(ohlc.index), periods)
     data = ohlc.iloc[-p:]
 
-    vol = 1 - (1/p)*(data['high']/data['low']).sum()/(data.max()['high']/data.min()['low'])
+    vol = (1/p)*(data['high']/data['low']).sum()/(data.max()['high']/data.min()['low'])
     return vol
 
 def SMA(data, periods=20):
