@@ -7,8 +7,11 @@ import mplfinance as mpf
 import numpy as np
 import pandas as pd
 import time
+import datetime
 
 from indicators import *
+
+import threading
 
 class TestDispatcher(Dispatcher):
     def __init__(self, balance=0, interval=5, pairs=[]):
@@ -17,7 +20,7 @@ class TestDispatcher(Dispatcher):
         self.last = None
 
         self.pairs = pairs
-        self.ticker_info = None
+        self.ticker_info = {}
 
         self.balance = balance
         self.positions = {}
@@ -28,6 +31,8 @@ class TestDispatcher(Dispatcher):
         self.winning_trades = 0
         self.trades = 0
 
+        self.sell_lock = threading.Lock()
+
         self.api = krakenex.API()
         self.api.load_key('kraken.key')
 
@@ -36,10 +41,9 @@ class TestDispatcher(Dispatcher):
     def print_status(self):
         print("Balance: %f\nPositions: %s\nPnL: %f" % (self.balance, str(self.positions), self.pnl))
 
-    def buy(self, pair, amount, price):
-        #ticker_info = self.kraken.get_ticker_information(pair)
-        #ask = ticker_info['a'][pair][0]
-        ask = price
+    def buy(self, pair, amount, price=None):
+        ask = price if price is not None else self.current_ask_price(pair)
+        bid = self.current_bid_price(pair)
 
         if amount <= 0:
             return
@@ -47,7 +51,9 @@ class TestDispatcher(Dispatcher):
             print("Buying %f %s at price %f" % (amount, pair, ask))
             self.balance -= amount * ask
 
-            order = {'amount': amount, 'price': ask, 'stoploss': ask*0.99, 'takeprofit': ask*1.02}
+            vol = volatility(self.data[pair])
+            print("VOLATILITY %f" % vol)
+            order = {'amount': amount, 'price': ask, 'stoploss': bid*(1-vol*0.03), 'takeprofit': ask*(1+vol*0.07) }
             if pair in self.positions:
                 self.positions[pair].append(order)
             else:
@@ -60,11 +66,10 @@ class TestDispatcher(Dispatcher):
             print("Balance too low to buy %f %s at price %f" % (amount, pair, ask))
     
     # Sells the given position. If no position given, sells all positions.
-    def sell(self, pair, price, position=None):
-        #ticker_info = self.kraken.get_ticker_information(pair)
-        #bid = ticker_info['b'][pair][0]
-        bid = price
+    def sell(self, pair, price=None, position=None):
+        bid = price if price is not None else self.current_bid_price(pair)
 
+        self.sell_lock.acquire()
         if pair in self.positions and position in self.positions[pair]:
             print("Selling %f %s at price %f" % (position['amount'], pair, bid))
             self.balance += position['amount'] * bid
@@ -82,18 +87,15 @@ class TestDispatcher(Dispatcher):
 
             self.print_status()
             print("")
-        else:
-            if position is None:
-                while pair in self.positions and len(self.positions[pair]) > 0:
-                    self.sell(pair, price, self.positions[pair][0])
-            else:
-                print("This position does not exist.")
+        elif pair in self.positions:
+            self.sell(pair, price, self.positions[pair][0])
+        self.sell_lock.release()
     
     def current_ask_price(self, pair):
-        return float(self.ticker_info.loc[pair]['a'][0])
+        return self.ticker_info[pair]['ask']
 
     def current_bid_price(self, pair):
-        return float(self.ticker_info.loc[pair]['b'][0])
+        return self.ticker_info[pair]['bid']
 
     def get_ohlc_data(self, pair):
         if pair not in self.data:
@@ -118,35 +120,75 @@ class TestDispatcher(Dispatcher):
             self.sells[pair].extend(extension)
 
         #if len(self.data[pair].index) > 800:
-        #    self.data[pair] = self.data[pair].iloc[-750:]
+        #   self.data[pair] = self.data[pair].iloc[-750:]
             
         return self.data[pair]
     
     def update(self):
-        time.sleep(5)
-        
-        self.ticker_info = self.kraken.get_ticker_information(','.join(self.pairs))
-        for pair in self.pairs:
-            if pair in self.positions:
-                positions = self.positions[pair]
-                bid = self.current_bid_price(pair)
-                for position in positions:
-                    if position['stoploss'] >= bid:
-                        print("Stoploss activated for %s" % (str(position)))
-                        self.sell(pair, bid, position)
-                    elif position['takeprofit'] <= bid:
-                        print("Takeprofit activated for %s" % (str(position)))
-                        self.sell(pair, bid, position)
+        pass
+
+    # Called whenever new ticker information is delivered by the WebSocket API
+    def update_ticker(self, pair, data):
+        print("PAIR %s TICKER: %s" % (pair,str(data)))
+        info = data[1]
+        ask = float(info['a'][0])
+        bid = float(info['b'][0])
+
+        self.ticker_info[pair] = {'ask': ask, 'bid': bid}
+
+        positions = self.positions[pair]
+        for position in positions:
+            if position['stoploss'] >= bid:
+                print("Stoploss activated for %s" % (str(position)))
+                self.sell(pair, bid, position)
+            elif position['takeprofit'] <= bid:
+                print("Takeprofit activated for %s" % (str(position)))
+                self.sell(pair, bid, position)
 
 def TestTradingBot():
     pairs = ['ADAEUR']
-    test_dispatcher = TestDispatcher(balance=1000, interval=1, pairs=pairs)
+    interval = 1
+
+    test_dispatcher = TestDispatcher(balance=1000, interval=interval, pairs=pairs)
     test_bot = TradingBot(test_dispatcher, pairs=pairs)
+
+    ws_names = test_dispatcher.kraken.get_tradable_asset_pairs(pair=','.join(pairs))['wsname']
+
+    import websocket
+    import _thread
+    import json
+
+    ws_channels = {}
+
+    # Define WebSocket callback functions
+    def ws_message(ws, message):
+        j = json.loads(message)
+        if 'channelID' in j:
+            ws_channels[j['channelID']] = {'pair':j['pair'], 'subscription':j['subscription']}
+        
+        if '[' == message[0]:
+            cID = j[0]
+            pair = ws_names[ws_names == j[-1]].index[0]
+            if ws_channels[cID]['subscription']['name'] == 'ticker':
+                test_bot.dispatcher.update_ticker(pair, j)
+
+    def ws_open(ws):
+        for pair in ws_names.array:
+            #ws.send('{"event":"subscribe", "subscription":{"name":"ohlc", "interval":%d}, "pair":["%s"]}' % (interval, pair))
+            ws.send('{"event":"subscribe", "subscription":{"name":"ticker"}, "pair":["%s"]}' % (pair))
+
+    def ws_thread(*args):
+        ws = websocket.WebSocketApp("wss://ws.kraken.com/", on_open = ws_open, on_message = ws_message)
+        ws.run_forever()
+
+    # Start a new thread for the WebSocket interface
+    _thread.start_new_thread(ws_thread, ())
 
     return test_bot
 
 if __name__ == "__main__":
     test_bot = TestTradingBot()
+
     try:
         test_bot.strategy_2()
     except KeyboardInterrupt:
