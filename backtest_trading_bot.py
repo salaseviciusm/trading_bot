@@ -34,6 +34,7 @@ class TestDispatcher(Dispatcher):
         #ticker_info = self.kraken.get_ticker_information(pair)
         #ask = ticker_info['a'][pair][0]
         ask = price
+        bid = self.current_bid_price(pair)
 
         if amount <= 0:
             return
@@ -41,13 +42,14 @@ class TestDispatcher(Dispatcher):
             print("Buying %f %s at price %f" % (amount, pair, ask))
             self.balance -= amount * ask
             
-            order = {'amount': amount, 'price': ask, 'stoploss': ask*0.99}
+            vol = volatility(self.data[pair].iloc[:self.tick])
+            print("VOLATILITY %f" % vol)
+            order = {'amount': amount, 'price': ask, 'stoploss': bid*(1-vol*0.02), 'takeprofit': ask*(1+vol*0.07) }
             if pair in self.positions:
                 self.positions[pair].append(order)
             else:
                 self.positions[pair] = [order]
             self.buys[pair][-1] = ask
-
             self.print_status()
             print("")
         else:
@@ -116,9 +118,13 @@ class TestDispatcher(Dispatcher):
             if pair in self.positions:
                 positions = self.positions[pair]
                 bid = self.current_bid_price(pair)
+                ask = self.current_ask_price(pair)
                 for position in positions:
                     if position['stoploss'] >= bid:
                         print("Stoploss activated for %s" % (str(position)))
+                        self.sell(pair, bid, position)
+                    elif position['takeprofit'] <= ask:
+                        print("Takeprofit activated for %s" % (str(position)))
                         self.sell(pair, bid, position)
             
             if self.tick <= len(self.data[pair].index):
@@ -127,11 +133,11 @@ class TestDispatcher(Dispatcher):
         if finished and len(self.data) > 0:
             print("----- Test complete -----")
             print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
-            % (test_bot.dispatcher.trades,
-            test_bot.dispatcher.winning_trades,
-            100*test_bot.dispatcher.winning_trades/test_bot.dispatcher.trades,
-            100*(test_bot.dispatcher.pnl/1000),
-            "up" if test_bot.dispatcher.pnl > 0 else "down"))
+            % (self.trades,
+            self.winning_trades,
+            100*self.winning_trades/self.trades,
+            100*(self.pnl/1000),
+            "up" if self.pnl > 0 else "down"))
             time.sleep(10)
 
 def TestTradingBot():
@@ -156,17 +162,17 @@ if __name__ == "__main__":
             stoch_buy, stoch_sell, stoch_line = chart_signals(ohlc, stochastic_oscillator_signal, stochastic_oscillator)
             rsi_buy, rsi_sell, rsi_line = chart_signals(ohlc, RSI_signal, RSI, value_f_args={'period':14})
             #buy_ema, sell_ema, line_ema = chart_signals(ohlc, ema_crosses_higher_lower_sma_signal, SMA)
-            display_graph(ohlc, add_plots=
+            display_graph(ohlc, view_range=(50,), add_plots=
             [
                 {'data': test_bot.dispatcher.buys[pair], 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g'},
-                {'data': test_bot.dispatcher.sells[pair], 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g'},
+                {'data': test_bot.dispatcher.sells[pair], 'type':'scatter', 'markersize':50, 'marker':'*', 'color':'r'},
                 {'data': ohlc['high'].rolling(30).mean(), 'color':'y'},
                 {'data': ohlc['low'].rolling(30).mean(), 'color':'m'},
                 {'data': ohlc['high'].ewm(span=30).mean(), 'color':'b'},
                 {'data': ohlc['low'].ewm(span=30).mean(), 'color':'y'},
                 {'data': ohlc['low'].ewm(span=100).mean(), 'color':'r'},
                 {'data': stoch_buy, 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g', 'secondary_y':False, 'panel':1},
-                {'data': stoch_sell, 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g', 'secondary_y':False, 'panel':1},
+                {'data': stoch_sell, 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'r', 'secondary_y':False, 'panel':1},
                 {'data': stoch_line, 'panel':1, 'secondary_y':False},
                 {'data': stoch_line.rolling(3).mean(), 'panel':1, 'secondary_y':False},
                 {'data': h_line(80, len(ohlc.index)), 'panel':1, 'secondary_y':False, 'color':'black'},
