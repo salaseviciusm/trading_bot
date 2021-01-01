@@ -12,13 +12,6 @@ from chart_utils import chart_signals, display_graph, h_line
 from indicators import *
 
 
-class DispatcherData():
-    """
-    A class that stores the Dispatcher's data, such as OHLC data and the buys/sells array for each pair
-    """
-    def __init__(self):
-        pass
-
 class Dispatcher(ABC):
     """
     Abstract class that the bot will use for retrieving price data and buy/sell orders
@@ -71,7 +64,7 @@ class TradingBot:
                         curr_bid = self.dispatcher.current_bid_price(pair)
                         self.dispatcher.sell(pair, curr_bid)
     
-    def strategy_2 (self):
+    def strategy_2 (self, sleep=True):
         while(True):
             self.dispatcher.update()
 
@@ -92,6 +85,11 @@ class TradingBot:
                     #print("Sell!")
                     curr_bid = self.dispatcher.current_bid_price(pair)
                     self.dispatcher.sell(pair, curr_bid)
+            
+            if sleep:
+                time_till_next_candle = curr_candle['time'] + self.dispatcher.interval * 60 - time.time()
+                print("Sleeping for %ds" % time_till_next_candle)
+                time.sleep(time_till_next_candle)
 
 
 if __name__ == "__main__":
@@ -100,13 +98,6 @@ if __name__ == "__main__":
     
     kraken = KrakenAPI(api)
 
-    import matplotlib
-    import mplfinance as mpf
-    import pandas as pd
-
-    ticker_info = kraken.get_ticker_information('ADAEUR,BCHGBP')
-    print(ticker_info)
-    input()
     ohlc, _ = kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
 
     buy, sell, line = chart_signals(ohlc, stochastic_oscillator_signal, stochastic_oscillator)
