@@ -7,6 +7,18 @@ class Signal:
     SELL = 1
     HOLD = 2
 
+def volatility(ohlc, periods=24*12):
+    """ Calculate a custom measure for volatility.
+        Returns vol, where 0 <= vol <= 1- l^2/h^2, where
+        l is the lowest low, and h the highest high, in the
+        given period.
+    """
+    p = min(len(ohlc.index), periods)
+    data = ohlc.iloc[-p:]
+
+    vol = 1 - (1/p)*(data['high']/data['low']).sum()/(data.max()['high']/data.min()['low'])
+    return vol
+
 def SMA(data, periods=20):
     if len(data.index) == 0:
         return np.nan
@@ -73,14 +85,11 @@ def stochastic_oscillator(ohlc, period=14):
     if len(ohlc.index) == 0:
         return np.nan
 
-    p = min(ohlc['low'].size, period)
-
     # Lowest low in the period
-    ll = ohlc[-p:].min()['low']
+    ll = ohlc[-period:].min()['low']
     
     # Highest high in the period
-    hh = ohlc[-p:].max()['high']
-
+    hh = ohlc[-period:].max()['high']
     k = 100*(ohlc.iloc[-1]['close']-ll)/(hh-ll)
 
     return k
