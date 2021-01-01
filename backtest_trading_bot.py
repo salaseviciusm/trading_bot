@@ -123,7 +123,7 @@ class TestDispatcher(Dispatcher):
                     if position['stoploss'] >= bid:
                         print("Stoploss activated for %s" % (str(position)))
                         self.sell(pair, bid, position)
-                    elif position['takeprofit'] <= ask:
+                    elif position['takeprofit'] <= bid:
                         print("Takeprofit activated for %s" % (str(position)))
                         self.sell(pair, bid, position)
             
@@ -149,7 +149,7 @@ def TestTradingBot():
 if __name__ == "__main__":
     test_bot = TestTradingBot()
     try:
-        test_bot.strategy_2()
+        test_bot.strategy_2(sleep=False)
     except KeyboardInterrupt:
         print("Done")
 
