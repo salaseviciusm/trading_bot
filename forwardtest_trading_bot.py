@@ -6,6 +6,7 @@ from chart_utils import display_graph, chart_signals, h_line
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
+
 import time
 import datetime
 
@@ -108,12 +109,10 @@ class TestDispatcher(Dispatcher):
             self.sells[pair] = self.buys[pair].copy()
         else:
             ohlc, last = self.kraken.get_ohlc_data(pair, interval=self.interval, ascending=True, since=self.last)
+            self.data[pair].iloc[-1] = ohlc.iloc[0]
             if len(ohlc.index) > 1:
-                self.data[pair].iloc[-1] = ohlc.iloc[0]
                 self.data[pair] = self.data[pair].append(ohlc.iloc[1:])
                 self.last = last
-            else:
-                self.data[pair].iloc[-1] = ohlc.iloc[0]
             
             extension = [np.nan for i in range(len(ohlc.index)-1)]
             self.buys[pair].extend(extension)
@@ -129,10 +128,10 @@ class TestDispatcher(Dispatcher):
 
     # Called whenever new ticker information is delivered by the WebSocket API
     def update_ticker(self, pair, data):
-        print("PAIR %s TICKER: %s" % (pair,str(data)))
         info = data[1]
         ask = float(info['a'][0])
         bid = float(info['b'][0])
+        print("PAIR %s ASK: %s BID: %s" % (pair, ask, bid))
 
         self.ticker_info[pair] = {'ask': ask, 'bid': bid}
 
