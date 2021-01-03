@@ -42,9 +42,11 @@ class TestDispatcher(Dispatcher):
     def print_status(self):
         print("Balance: %f\nPositions: %s\nPnL: %f" % (self.balance, str(self.positions), self.pnl))
 
-    def buy(self, pair, amount, price=None):
-        ask = price if price is not None else self.current_ask_price(pair)
+    def buy(self, pair):
+        ask = self.current_ask_price(pair)
         bid = self.current_bid_price(pair)
+
+        amount = self.balance / ask
 
         if amount <= 0:
             return
@@ -67,11 +69,13 @@ class TestDispatcher(Dispatcher):
             print("Balance too low to buy %f %s at price %f" % (amount, pair, ask))
     
     # Sells the given position. If no position given, sells all positions.
-    def sell(self, pair, price=None, position=None):
-        bid = price if price is not None else self.current_bid_price(pair)
+    def sell(self, pair):
+        bid = self.current_bid_price(pair)
 
         self.sell_lock.acquire()
-        if pair in self.positions and position in self.positions[pair]:
+        while pair in self.positions and len(self.positions[pair]) > 0:
+            position = self.positions[pair][0]
+
             print("Selling %f %s at price %f" % (position['amount'], pair, bid))
             self.balance += position['amount'] * bid
 
@@ -88,8 +92,6 @@ class TestDispatcher(Dispatcher):
 
             self.print_status()
             print("")
-        elif pair in self.positions:
-            self.sell(pair, price, self.positions[pair][0])
         self.sell_lock.release()
     
     def current_ask_price(self, pair):
@@ -139,10 +141,10 @@ class TestDispatcher(Dispatcher):
         for position in positions:
             if position['stoploss'] >= bid:
                 print("Stoploss activated for %s" % (str(position)))
-                self.sell(pair, bid, position)
+                self.sell(pair)
             elif position['takeprofit'] <= bid:
                 print("Takeprofit activated for %s" % (str(position)))
-                self.sell(pair, bid, position)
+                self.sell(pair)
 
 def TestTradingBot():
     pairs = ['ADAEUR']

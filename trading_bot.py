@@ -20,10 +20,10 @@ class Dispatcher(ABC):
     exchanges, as well as for testing strategies.
     """
 
-    def buy(self, pair, amount, price):
+    def buy(self, pair):
         raise NotImplementedError
 
-    def sell(self, pair, price, position):
+    def sell(self, pair):
         raise NotImplementedError
 
     def current_ask_price(self, pair):
@@ -57,12 +57,10 @@ class TradingBot:
 
                 if signal == Signal.BUY:
                     if isGreen(curr_candle):
-                        curr_ask = self.dispatcher.current_ask_price(pair)
-                        self.dispatcher.buy(pair, int(self.dispatcher.balance / curr_ask), curr_ask)
+                        self.dispatcher.buy(pair)
                 elif signal == Signal.SELL:
                     if isRed(curr_candle):
-                        curr_bid = self.dispatcher.current_bid_price(pair)
-                        self.dispatcher.sell(pair, curr_bid)
+                        self.dispatcher.sell(pair)
     
     def strategy_2 (self, sleep=True):
         while(True):
@@ -78,13 +76,11 @@ class TradingBot:
                 rsi = RSI(ohlc[:-1], 14)
 
                 if signal == Signal.BUY and stoch_signal != Signal.SELL and (EMA(ohlc['low'], 14) > EMA(ohlc['low'],100) or rsi < 30):
-                    #print("Buy!")
-                    curr_ask = self.dispatcher.current_ask_price(pair)
-                    self.dispatcher.buy(pair, int(self.dispatcher.balance / curr_ask), curr_ask)
+                    print("Buy!")
+                    self.dispatcher.buy(pair)
                 elif signal == Signal.SELL and stoch_signal != Signal.BUY:
-                    #print("Sell!")
-                    curr_bid = self.dispatcher.current_bid_price(pair)
-                    self.dispatcher.sell(pair, curr_bid)
+                    print("Sell!")
+                    self.dispatcher.sell(pair)
             
             if sleep:
                 time_till_next_candle = curr_candle['time'] + self.dispatcher.interval * 60 - time.time()
@@ -99,6 +95,8 @@ if __name__ == "__main__":
     kraken = KrakenAPI(api)
 
     ohlc, _ = kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
+
+    print(volatility(ohlc))
 
     buy, sell, line = chart_signals(ohlc, stochastic_oscillator_signal, stochastic_oscillator)
 
