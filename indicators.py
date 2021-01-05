@@ -70,9 +70,9 @@ def ema_crosses_higher_lower_sma_signal(ohlc):
     high_sma = SMA(ohlc['high'], 30)
     low_sma = SMA(ohlc['low'], 30)
     
-    if EMA(ohlc['high'], 15) > low_sma:
+    if EMA(ohlc['high'], 14) > low_sma and EMA(ohlc.iloc[:-1]['high'], 14) <= SMA(ohlc.iloc[:-1]['low'], 30):
         return Signal.BUY
-    if EMA(ohlc['low'], 15) < high_sma:
+    if EMA(ohlc['low'], 14) < high_sma and EMA(ohlc.iloc[:-1]['low'], 14) >= SMA(ohlc.iloc[:-1]['high'], 30):
         return Signal.SELL
     return Signal.HOLD
 
@@ -88,6 +88,8 @@ def stochastic_oscillator(ohlc, period=14):
     
     # Highest high in the period
     hh = ohlc[-period:].max()['high']
+    if hh-ll == 0:
+        return np.nan
     k = 100*(ohlc.iloc[-1]['close']-ll)/(hh-ll)
 
     return k
@@ -113,13 +115,11 @@ def stochastic_oscillator_signal(ohlc, kperiod=14, dperiod=3):
     k = pd.Series(kvals)
     d = SMA(k, dperiod)
 
-    if k.iloc[-1] < 20 and d < 20:
-        if k.iloc[-1] > d :
-            return Signal.BUY
+    if k.iloc[-1] < 20 and k.iloc[-1] > d:
+        return Signal.BUY
 
-    if k.iloc[-1] > 80 and d > 80:
-        if k.iloc[-1] < d:
-            return Signal.SELL
+    if k.iloc[-1] > 80 and k.iloc[-1] < d:
+        return Signal.SELL
 
     return Signal.HOLD
 
