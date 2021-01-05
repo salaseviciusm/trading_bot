@@ -76,10 +76,10 @@ class TradingBot:
                 rsi = RSI(ohlc[:-1], 14)
 
                 if signal == Signal.BUY and stoch_signal != Signal.SELL and (EMA(ohlc['low'], 14) > EMA(ohlc['low'],100) or rsi < 30):
-                    print("Buy!")
+                    #print("Buy!")
                     self.dispatcher.buy(pair)
                 elif signal == Signal.SELL and stoch_signal != Signal.BUY:
-                    print("Sell!")
+                    #print("Sell!")
                     self.dispatcher.sell(pair)
             
             if sleep:
