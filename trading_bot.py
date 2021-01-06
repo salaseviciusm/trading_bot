@@ -13,6 +13,9 @@ from chart_utils import chart_signals, display_graph, h_line
 from indicators import *
 
 
+def timestamp():
+    return datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+
 class Dispatcher(ABC):
     """
     Abstract class that the bot will use for retrieving price data and buy/sell orders
@@ -86,7 +89,7 @@ class TradingBot:
             if sleep:
                 time_till_next_candle = curr_candle['time'] + self.dispatcher.interval * 60 - time.time()
                 if time_till_next_candle > 0:
-                    print("%s Sleeping for %ds" % (datetime.now().strftime('%d-%m-%Y %H:%M:%S'), time_till_next_candle))
+                    print("%s Sleeping for %ds" % (timestamp(), time_till_next_candle))
                     time.sleep(time_till_next_candle)
 
 
