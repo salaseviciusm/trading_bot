@@ -53,7 +53,7 @@ class KrakenDispatcher(Dispatcher):
         self.pnl = 0
 
     def print_status(self):
-        print("%s Balance: %s\nPnL: %f" % (datetime.now().strftime('%d-%m-%Y %H-%M-%S'), str(self.balance), self.pnl))
+        print("%s Balance: %s\nPnL: %f" % (datetime.now().strftime('%d-%m-%Y %H:%M:%S'), str(self.balance), self.pnl))
     
     def get_userref(self, pair):
         return self.userrefs[pair]
@@ -63,7 +63,7 @@ class KrakenDispatcher(Dispatcher):
             ask = self.current_ask_price(pair)
 
             quote = self.pairs.loc[pair]['quote']
-            amount = self.balance.loc[quote]['vol'] * 0.99 / ask # Buy 99% of everything I can
+            amount = int(self.balance.loc[quote]['vol'] * 0.99 / ask) # Buy 99% of everything I can
 
             ordermin = float(self.pairs.loc[pair]['ordermin'])
             if amount < ordermin:
@@ -71,7 +71,7 @@ class KrakenDispatcher(Dispatcher):
                 return
 
             if self.balance.loc[quote]['vol'] >= amount * ask:
-                print("%s Buying %f %s at price %f" % (datetime.now().strftime('%d-%m-%Y %H-%M-%S'), amount, pair, ask))
+                print("%s Buying %f %s at price %f" % (datetime.now().strftime('%d-%m-%Y %H:%M:%S'), amount, pair, ask))
 
                 vol = volatility(self.data[pair])
                 print("VOLATILITY %f" % vol)
@@ -106,7 +106,7 @@ class KrakenDispatcher(Dispatcher):
 
             base = self.pairs.loc[pair]['base']
 
-            amount = self.balance.loc[base]['vol'] * 0.99 # Sell 99% of everything
+            amount = int(self.balance.loc[base]['vol'] * 0.99) # Sell 99% of everything
 
             ordermin = float(self.pairs.loc[pair]['ordermin'])
             if amount < ordermin:
@@ -114,13 +114,16 @@ class KrakenDispatcher(Dispatcher):
                 return
 
             if self.balance.loc[base]['vol'] >= amount:
-                print("%s Selling %f %s at price %f" % (datetime.now().strftime('%d-%m-%Y %H-%M-%S'), amount, pair, bid))
+                print("%s Selling %f %s at price %f" % (datetime.now().strftime('%d-%m-%Y %H:%M:%S'), amount, pair, bid))
 
                 userref = self.get_userref(pair)
 
                 # Add a sell order at market price. When closed, add a stop-loss order
+
+                # Cancel all other open orders for this pair
+                self.kraken.cancel_open_order('%d' % userref)
                 res = self.kraken.add_standard_order(
-                    pair, 'sell', 'market', '%f' % amount,
+                    pair, 'sell', 'market', '%d' % amount,
                     userref='%d' % userref,
                     validate=False)
                 print("Order made: %s" % str(res))
@@ -253,7 +256,7 @@ def KrakenTradingBot(pairs, interval):
     return bot
 
 if __name__ == '__main__':
-    bot = KrakenTradingBot(pairs=['ADAEUR'], interval=5)
+    bot = KrakenTradingBot(pairs=['ADAEUR'], interval=1)
     try:
         bot.strategy_2()
     except KeyboardInterrupt:
