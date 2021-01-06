@@ -1,7 +1,7 @@
 import krakenex
 from pykrakenapi import KrakenAPI
 
-from trading_bot import Dispatcher, TradingBot
+from trading_bot import Dispatcher, TradingBot, timestamp
 from chart_utils import display_graph, chart_signals, h_line
 import mplfinance as mpf
 import numpy as np
@@ -11,8 +11,6 @@ import time
 from indicators import *
 
 import threading
-
-from datetime import datetime
 
 """
 TODO:
@@ -53,7 +51,7 @@ class KrakenDispatcher(Dispatcher):
         self.pnl = 0
 
     def print_status(self):
-        print("%s Balance: %s\nPnL: %f" % (datetime.now().strftime('%d-%m-%Y %H:%M:%S'), str(self.balance), self.pnl))
+        print("%s Balance: %s\nPnL: %f" % (timestamp(), str(self.balance), self.pnl))
     
     def get_userref(self, pair):
         return self.userrefs[pair]
@@ -71,7 +69,7 @@ class KrakenDispatcher(Dispatcher):
                 return
 
             if self.balance.loc[quote]['vol'] >= amount * ask:
-                print("%s Buying %f %s at price %f" % (datetime.now().strftime('%d-%m-%Y %H:%M:%S'), amount, pair, ask))
+                print("%s Buying %f %s at price %f" % (timestamp(), amount, pair, ask))
 
                 vol = volatility(self.data[pair])
                 print("VOLATILITY %f" % vol)
@@ -114,7 +112,7 @@ class KrakenDispatcher(Dispatcher):
                 return
 
             if self.balance.loc[base]['vol'] >= amount:
-                print("%s Selling %f %s at price %f" % (datetime.now().strftime('%d-%m-%Y %H:%M:%S'), amount, pair, bid))
+                print("%s Selling %f %s at price %f" % (timestamp(), amount, pair, bid))
 
                 userref = self.get_userref(pair)
 
