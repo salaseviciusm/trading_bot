@@ -6,6 +6,7 @@ import numpy as np
 from abc import ABC
 
 import time
+from datetime import datetime
 
 from candlestick import isRed, isGreen
 from chart_utils import chart_signals, display_graph, h_line
@@ -84,8 +85,9 @@ class TradingBot:
             
             if sleep:
                 time_till_next_candle = curr_candle['time'] + self.dispatcher.interval * 60 - time.time()
-                print("Sleeping for %ds" % time_till_next_candle)
-                time.sleep(time_till_next_candle)
+                if time_till_next_candle > 0:
+                    print("%s Sleeping for %ds" % (datetime.now().strftime('%d-%m-%Y %H:%M:%S'), time_till_next_candle))
+                    time.sleep(time_till_next_candle)
 
 
 if __name__ == "__main__":
