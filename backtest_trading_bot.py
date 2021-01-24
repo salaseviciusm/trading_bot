@@ -2,13 +2,12 @@ import krakenex
 from pykrakenapi import KrakenAPI
 
 from trading_bot import Dispatcher, TradingBot
-from chart_utils import display_graph, chart_signals, h_line
-import mplfinance as mpf
 import numpy as np
 import pandas as pd
 import time
 
 from indicators import *
+
 
 class TestDispatcher(Dispatcher):
     def __init__(self, balance=0, positions=dict(), pnl=0):
@@ -41,7 +40,7 @@ class TestDispatcher(Dispatcher):
         if self.balance >= amount * ask:
             print("Buying %f %s at price %f" % (amount, pair, ask))
             self.balance -= amount * ask
-            
+
             vol = volatility(self.data[pair].iloc[:self.tick])
             print("VOLATILITY %f" % vol)
             order = {'amount': amount, 'price': ask, 'stoploss': bid*(1-vol*0.02), 'takeprofit': ask*(1+vol*0.07) }
@@ -54,8 +53,8 @@ class TestDispatcher(Dispatcher):
             print("")
         else:
             print("Balance too low to buy %f %s at price %f" % (amount, pair, ask))
-    
-    # Sells the given position. If no position given, sells all positions.
+
+    # Sells the given pair
     def sell(self, pair):
         #ticker_info = self.kraken.get_ticker_information(pair)
         #bid = ticker_info['b'][pair][0]
@@ -80,7 +79,7 @@ class TestDispatcher(Dispatcher):
 
             self.print_status()
             print("")
-    
+
     def current_ask_price(self, pair):
         index = min(self.tick-1, len(self.data[pair].index) - 1)
         return self.data[pair].iloc[index]['open']
@@ -92,7 +91,7 @@ class TestDispatcher(Dispatcher):
     def get_ohlc_data(self, pair):
         if pair not in self.data:
             # OHLC is sorted so that the latest element is at OHLC.iloc[-1]
-            #ohlc, _ = self.kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
+            # ohlc, _ = self.kraken.get_ohlc_data("ADAEUR", interval=5, ascending=True)
             ohlc = pd.read_csv('backtest_data/%s_5.csv' % (pair), names=['time', 'open', 'high', 'low', 'close', 'volume', 'count'])
             ohlc['dtime'] = pd.to_datetime(ohlc.time, unit='s')
             ohlc.sort_values('dtime', ascending=True, inplace=True)
@@ -100,12 +99,12 @@ class TestDispatcher(Dispatcher):
             self.data[pair] = ohlc
             self.buys[pair] = []
             self.sells[pair] = []
-            
+
         return self.data[pair].iloc[:self.tick]
-    
+
     def update(self):
         self.tick += 1
-        
+
         finished = True
         for pair in self.data:
             self.buys[pair].append(np.nan)
@@ -122,10 +121,10 @@ class TestDispatcher(Dispatcher):
                     elif position['takeprofit'] <= bid:
                         print("Takeprofit activated for %s" % (str(position)))
                         self.sell(pair)
-            
+
             if self.tick <= len(self.data[pair].index):
                 finished = False
-        
+
         if finished and len(self.data) > 0:
             print("----- Test complete -----")
             print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
@@ -136,11 +135,13 @@ class TestDispatcher(Dispatcher):
             "up" if self.pnl > 0 else "down"))
             time.sleep(10)
 
+
 def TestTradingBot():
     test_dispatcher = TestDispatcher(balance=1000)
     test_bot = TradingBot(test_dispatcher, pairs=['BCHGBP'])
 
     return test_bot
+
 
 if __name__ == "__main__":
     test_bot = TestTradingBot()
@@ -149,12 +150,14 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Done")
 
+        from chart_utils import display_graph, chart_signals, h_line
+
         for pair in test_bot.pairs:
             ohlc = test_bot.dispatcher.data[pair]
             print(len(ohlc.index))
             print(len(test_bot.dispatcher.buys[pair]))
             print(len(test_bot.dispatcher.sells[pair]))
-            
+
             stoch_buy, stoch_sell, stoch_line = chart_signals(ohlc, stochastic_oscillator_signal, stochastic_oscillator)
             rsi_buy, rsi_sell, rsi_line = chart_signals(ohlc, RSI_signal, RSI, value_f_args={'period':14})
             #buy_ema, sell_ema, line_ema = chart_signals(ohlc, ema_crosses_higher_lower_sma_signal, SMA)
@@ -164,8 +167,8 @@ if __name__ == "__main__":
                 {'data': test_bot.dispatcher.sells[pair], 'type':'scatter', 'markersize':50, 'marker':'*', 'color':'r'},
                 {'data': ohlc['high'].rolling(30).mean(), 'color':'y'},
                 {'data': ohlc['low'].rolling(30).mean(), 'color':'m'},
-                {'data': ohlc['high'].ewm(span=30).mean(), 'color':'b'},
-                {'data': ohlc['low'].ewm(span=30).mean(), 'color':'y'},
+                {'data': ohlc['high'].ewm(span=15).mean(), 'color':'b'},
+                {'data': ohlc['low'].ewm(span=14).mean(), 'color':'y'},
                 {'data': ohlc['low'].ewm(span=100).mean(), 'color':'r'},
                 {'data': stoch_buy, 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'g', 'secondary_y':False, 'panel':1},
                 {'data': stoch_sell, 'type':'scatter', 'markersize':100, 'marker':'*', 'color':'r', 'secondary_y':False, 'panel':1},

@@ -1,17 +1,16 @@
+from indicators import Signal
+import numpy as np
+import pandas as pd
+import mplfinance as mpf
 import matplotlib
 matplotlib.use('TkAgg')
-import mplfinance as mpf
 
-import numpy as np
-
-import pandas as pd
-
-from indicators import Signal, SMA, EMA, sma_signal
 
 def h_line(y, length):
     """ Returns a pandas Series of size length which represents a horizontal line on the axis at value y=y
     """
-    return pd.Series([y for i in range (length)])
+    return pd.Series([y for i in range(length)])
+
 
 def chart_signals(ohlc, signal_f, value_f, signal_f_args={}, value_f_args={}):
     """ Returns 3 lists:
@@ -20,8 +19,8 @@ def chart_signals(ohlc, signal_f, value_f, signal_f_args={}, value_f_args={}):
           (Both based on signal_f() placed at value_f())
         * One pandas Series representing the line for the signal indicator
     """
-    buy = [np.nan for i in range (len(ohlc.index))]
-    buy[0] = 0 # Ensure that the entire list isn't NaN as this will prevent MPL from plotting it
+    buy = [np.nan for i in range(len(ohlc.index))]
+    buy[0] = 0  # Ensure that the entire list isn't NaN as this will prevent MPL from plotting it
     sell = buy.copy()
     value_line = buy.copy()
 
@@ -34,7 +33,7 @@ def chart_signals(ohlc, signal_f, value_f, signal_f_args={}, value_f_args={}):
         if signal == Signal.BUY:
             buy[i] = value
         elif signal == Signal.SELL:
-            sell[i]= value
+            sell[i] = value
 
     return buy, sell, pd.Series(value_line)
 

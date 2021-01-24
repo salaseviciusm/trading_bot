@@ -2,17 +2,12 @@ import krakenex
 from pykrakenapi import KrakenAPI
 
 from trading_bot import Dispatcher, TradingBot
-from chart_utils import display_graph, chart_signals, h_line
-import mplfinance as mpf
 import numpy as np
-import pandas as pd
-
-import time
-import datetime
 
 from indicators import *
 
 import threading
+
 
 class TestDispatcher(Dispatcher):
     def __init__(self, balance=0, interval=5, pairs=[]):
@@ -67,7 +62,7 @@ class TestDispatcher(Dispatcher):
             print("")
         else:
             print("Balance too low to buy %f %s at price %f" % (amount, pair, ask))
-    
+
     # Sells the given position. If no position given, sells all positions.
     def sell(self, pair):
         bid = self.current_bid_price(pair)
@@ -93,7 +88,7 @@ class TestDispatcher(Dispatcher):
             self.print_status()
             print("")
         self.sell_lock.release()
-    
+
     def current_ask_price(self, pair):
         return self.ticker_info[pair]['ask']
 
@@ -115,16 +110,16 @@ class TestDispatcher(Dispatcher):
             if len(ohlc.index) > 1:
                 self.data[pair] = self.data[pair].append(ohlc.iloc[1:])
                 self.last = last
-            
+
             extension = [np.nan for i in range(len(ohlc.index)-1)]
             self.buys[pair].extend(extension)
             self.sells[pair].extend(extension)
 
-        #if len(self.data[pair].index) > 800:
+        # if len(self.data[pair].index) > 800:
         #   self.data[pair] = self.data[pair].iloc[-750:]
-            
+
         return self.data[pair]
-    
+
     def update(self):
         pass
 
@@ -146,6 +141,7 @@ class TestDispatcher(Dispatcher):
                 print("Takeprofit activated for %s" % (str(position)))
                 self.sell(pair)
 
+
 def TestTradingBot():
     pairs = ['ADAEUR']
     interval = 1
@@ -166,7 +162,7 @@ def TestTradingBot():
         j = json.loads(message)
         if 'channelID' in j:
             ws_channels[j['channelID']] = {'pair':j['pair'], 'subscription':j['subscription']}
-        
+
         if '[' == message[0]:
             cID = j[0]
             pair = ws_names[ws_names == j[-1]].index[0]
@@ -187,6 +183,7 @@ def TestTradingBot():
 
     return test_bot
 
+
 if __name__ == "__main__":
     test_bot = TestTradingBot()
 
@@ -194,6 +191,8 @@ if __name__ == "__main__":
         test_bot.strategy_2()
     except KeyboardInterrupt:
         print("Done")
+
+        from chart_utils import display_graph, chart_signals, h_line
 
         print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
             % (test_bot.dispatcher.trades,
@@ -207,7 +206,7 @@ if __name__ == "__main__":
             print(len(ohlc.index))
             print(len(test_bot.dispatcher.buys[pair]))
             print(len(test_bot.dispatcher.sells[pair]))
-            
+
             stoch_buy, stoch_sell, stoch_line = chart_signals(ohlc, stochastic_oscillator_signal, stochastic_oscillator)
             rsi_buy, rsi_sell, rsi_line = chart_signals(ohlc, RSI_signal, RSI, value_f_args={'period':14})
             #buy_ema, sell_ema, line_ema = chart_signals(ohlc, ema_crosses_higher_lower_sma_signal, SMA)

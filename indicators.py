@@ -2,10 +2,12 @@ from candlestick import isGreen, isRed
 import pandas as pd
 import numpy as np
 
+
 class Signal:
     BUY = 0
     SELL = 1
     HOLD = 2
+
 
 def volatility(ohlc, periods=24*12):
     """ Calculate a custom measure for volatility.
@@ -14,22 +16,30 @@ def volatility(ohlc, periods=24*12):
     p = min(len(ohlc.index), periods)
     data = ohlc.iloc[-p:]
 
-    vol = (1/p)*(data['high']/data['low']).sum()/(data.max()['high']/data.min()['low'])
+    s = (data['high']/data['low']).sum()
+
+    vol = (1/p) * s / (data.max()['high']/data.min()['low'])
     return vol
+
 
 def SMA(data, periods=20):
     if len(data.index) == 0:
         return np.nan
     return data.rolling(periods).mean().iloc[-1]
 
+
 def EMA(data, periods=20):
     if len(data.index) == 0:
         return np.nan
     return data.ewm(span=periods).mean().iloc[-1]
 
+
 def has_crossed_value(ohlc_candle, target_value):
-    return (ohlc_candle['open'] >= target_value and ohlc_candle['close'] <= target_value) \
-        or (ohlc_candle['open'] <= target_value and ohlc_candle['close'] >= target_value)
+    return (ohlc_candle['open'] >= target_value
+            and ohlc_candle['close'] <= target_value) \
+        or (ohlc_candle['open'] <= target_value
+            and ohlc_candle['close'] >= target_value)
+
 
 def sma_signal(ohlc):
     """ Returns a Signal for the last candlestick in the ohlc data frame.
@@ -46,6 +56,7 @@ def sma_signal(ohlc):
         if curr_candle['close'] < SMA(ohlc['close']) and isRed(prev_candle):
             return Signal.SELL
     return Signal.HOLD
+
 
 def higher_lower_sma_signal(ohlc):
     """ Returns BUY if candle is completely above higher moving average,
@@ -66,26 +77,31 @@ def higher_lower_sma_signal(ohlc):
         return Signal.SELL
     return Signal.HOLD
 
+
 def ema_crosses_higher_lower_sma_signal(ohlc):
     high_sma = SMA(ohlc['high'], 30)
     low_sma = SMA(ohlc['low'], 30)
-    
+
     if EMA(ohlc['high'], 14) > low_sma and EMA(ohlc.iloc[:-1]['high'], 14) <= SMA(ohlc.iloc[:-1]['low'], 30):
         return Signal.BUY
+
     if EMA(ohlc['low'], 14) < high_sma and EMA(ohlc.iloc[:-1]['low'], 14) >= SMA(ohlc.iloc[:-1]['high'], 30):
         return Signal.SELL
+
     return Signal.HOLD
+
 
 def stochastic_oscillator(ohlc, period=14):
     """
-    Returns the value of K% for the latest candle in ohlc based on the given period
+    Returns the value of K% for the latest candle in ohlc based on the given
+    period
     """
     if len(ohlc.index) == 0:
         return np.nan
 
     # Lowest low in the period
     ll = ohlc[-period:].min()['low']
-    
+
     # Highest high in the period
     hh = ohlc[-period:].max()['high']
     if hh-ll == 0:
@@ -94,21 +110,24 @@ def stochastic_oscillator(ohlc, period=14):
 
     return k
 
+
 def close(ohlc):
     return ohlc.iloc[-1]['close'] if len(ohlc.index) > 0 else np.nan
 
+
 def stochastic_oscillator_signal(ohlc, kperiod=14, dperiod=3):
     """
-    Returns the signal returned by a stochastic oscillator indicator with kperiod on the calculation and
-    dperiod SMA of the K value.
-    Returns BUY when there are oversold conditions and the K line crosses above the D line
+    Returns the signal returned by a stochastic oscillator indicator with
+    kperiod on the calculation and dperiod SMA of the K value.
+    Returns BUY when there are oversold conditions and the K line crosses above
+    the D line
     """
 
     if len(ohlc.index) < max(kperiod, dperiod):
         return Signal.HOLD
 
     kvals = []
-    for i in range (1, dperiod):
+    for i in range(1, dperiod):
         kvals.append(stochastic_oscillator(ohlc[:-dperiod+i], kperiod))
     kvals.append(stochastic_oscillator(ohlc, kperiod))
 
@@ -123,37 +142,21 @@ def stochastic_oscillator_signal(ohlc, kperiod=14, dperiod=3):
 
     return Signal.HOLD
 
+
 def RSI(ohlc, period):
     # rsi = 100 - [100 / (1 + (avg price up / avg price down))]
     if len(ohlc.index) == 0:
         return np.nan
 
-    deltas           =  ohlc['close'].diff()
-    seed             =  deltas[-period:]
-    up               =  seed[seed >= 0].sum() / period
-    down             = -seed[seed <  0].sum() / period
-    rs               =  up / down if down != 0 else 0
-
-    # # Smoothing values
-    # for i in range(period, ohlc['open'].size):
-    #     delta = deltas[i]
-
-    #     if  delta   >  0:
-    #         upval   =  delta
-    #         downval =  0.
-    #     else:
-    #         upval   =  0.
-    #         downval = -delta
-
-    #     up   = ( up   * ( period - 1 ) + upval   ) / period
-    #     down = ( down * ( period - 1 ) + downval ) / period
-
-    #     rs      = up / down
-
-    #     rsi[i]  = 100. - ( 100. / ( 1. + rs ) )
+    deltas = ohlc['close'].diff()
+    seed = deltas[-period:]
+    up = seed[seed >= 0].sum() / period
+    down = -seed[seed < 0].sum() / period
+    rs = up / down if down != 0 else 0
 
     return 100 - (100 / (1 + rs))
-    
+
+
 def RSI_signal(ohlc, period=14):
     rsi = RSI(ohlc, period)
     if rsi > 70:

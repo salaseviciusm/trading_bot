@@ -2,22 +2,12 @@ import krakenex
 from pykrakenapi import KrakenAPI
 
 from trading_bot import Dispatcher, TradingBot, timestamp
-from chart_utils import display_graph, chart_signals, h_line
-import mplfinance as mpf
 import numpy as np
-import pandas as pd
-import time
 
 from indicators import *
 
 import threading
 
-"""
-TODO:
-* Implement buying/selling using REST API
-* Connect to authenticated WebSockets API using REST API method GetWebSocketsToken
-* Retrieve openOrders with WebSockets API to get updates on when orders are completed
-"""
 
 class KrakenDispatcher(Dispatcher):
     def __init__(self, interval=5, pairs=[], stop_loss_min_perc=1, stop_loss_max_perc=3, take_profit_max_perc=8):
@@ -38,7 +28,7 @@ class KrakenDispatcher(Dispatcher):
         self.take_profit_max_perc = take_profit_max_perc
 
         self.sell_lock = threading.Lock()
-        
+
         self.positions = {}
         self.userrefs = {pair:i+1 for i, pair in enumerate(pairs)}
 
@@ -52,7 +42,7 @@ class KrakenDispatcher(Dispatcher):
 
     def print_status(self):
         print("%s Balance: %s\nPnL: %f" % (timestamp(), str(self.balance), self.pnl))
-    
+
     def get_userref(self, pair):
         return self.userrefs[pair]
 
@@ -97,7 +87,7 @@ class KrakenDispatcher(Dispatcher):
                 print("")
             else:
                 print("Balance too low to buy %f %s at price %f" % (amount, pair, ask))
-    
+
     def sell(self, pair):
         if self.balance is not None and pair in self.ticker_info:
             bid = self.current_bid_price(pair)
@@ -140,7 +130,7 @@ class KrakenDispatcher(Dispatcher):
                 print("")
             else:
                 print("Balance too low to sell %f %s at price %f" % (amount, pair, bid))
-    
+
     def current_ask_price(self, pair):
         return self.ticker_info[pair]['ask']
 
@@ -162,16 +152,16 @@ class KrakenDispatcher(Dispatcher):
             if len(ohlc.index) > 1:
                 self.data[pair] = self.data[pair].append(ohlc.iloc[1:])
                 self.last = last
-            
+
             extension = [np.nan for i in range(len(ohlc.index)-1)]
             self.buys[pair].extend(extension)
             self.sells[pair].extend(extension)
 
         #if len(self.data[pair].index) > 800:
         #   self.data[pair] = self.data[pair].iloc[-750:]
-            
+
         return self.data[pair]
-    
+
     def update(self):
         pass
 
@@ -196,7 +186,7 @@ class KrakenDispatcher(Dispatcher):
 def KrakenTradingBot(pairs, interval):
     dispatcher = KrakenDispatcher(interval=interval, pairs=pairs)
     bot = TradingBot(dispatcher, pairs=pairs)
-    
+
     asset_pairs = dispatcher.kraken.get_tradable_asset_pairs(pair=','.join(pairs))
     bot.dispatcher.pairs = asset_pairs[['ordermin', 'wsname', 'quote', 'base']]
 
@@ -215,7 +205,7 @@ def KrakenTradingBot(pairs, interval):
         j = json.loads(message)
         if 'channelID' in j:
             ws_channels[j['channelID']] = {'pair':j['pair'], 'subscription':j['subscription']}
-        
+
         if '[' == message[0]:
             cID = j[0]
             pair = ws_names[ws_names == j[-1]].index[0]
@@ -225,10 +215,10 @@ def KrakenTradingBot(pairs, interval):
     def ws_open(ws):
         for pair in ws_names.array:
             ws.send('{"event":"subscribe", "subscription":{"name":"ticker"}, "pair":["%s"]}' % (pair))
-    
+
     def ws_auth_open(ws):
         ws.send('{"event":"subscribe", "subscription":{"name":"openOrders", "token":"%s"} }' % (token))
-    
+
     def ws_auth_message(ws, message):
         j = json.loads(message)
         if '[' == message[0]:
@@ -241,7 +231,7 @@ def KrakenTradingBot(pairs, interval):
         print("Connecting to public WebSocket API")
         ws = websocket.WebSocketApp("wss://ws.kraken.com/", on_open = ws_open, on_message = ws_message)
         ws.run_forever()
-    
+
     def ws_auth_thread(*args):
         print("Connecting to private WebSocket API")
         ws = websocket.WebSocketApp("wss://ws-auth.kraken.com/", on_open = ws_auth_open, on_message = ws_auth_message)
@@ -253,12 +243,15 @@ def KrakenTradingBot(pairs, interval):
 
     return bot
 
+
 if __name__ == '__main__':
     bot = KrakenTradingBot(pairs=['ADAEUR'], interval=1)
     try:
         bot.strategy_2()
     except KeyboardInterrupt:
         print("Done")
+
+        # from chart_utils import display_graph, chart_signals, h_line
 
         print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
             % (bot.dispatcher.trades,
