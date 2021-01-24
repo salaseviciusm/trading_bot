@@ -30,7 +30,7 @@ class KrakenDispatcher(Dispatcher):
         self.sell_lock = threading.Lock()
 
         self.positions = {}
-        self.userrefs = {pair:i+1 for i, pair in enumerate(pairs)}
+        self.userrefs = {pair: i+1 for i, pair in enumerate(pairs)}
 
         self.api = krakenex.API()
         self.api.load_key('kraken.key')
@@ -51,7 +51,7 @@ class KrakenDispatcher(Dispatcher):
             ask = self.current_ask_price(pair)
 
             quote = self.pairs.loc[pair]['quote']
-            amount = int(self.balance.loc[quote]['vol'] * 0.99 / ask) # Buy 99% of everything I can
+            amount = int(self.balance.loc[quote]['vol'] / ask)
 
             ordermin = float(self.pairs.loc[pair]['ordermin'])
             if amount < ordermin:
@@ -94,7 +94,7 @@ class KrakenDispatcher(Dispatcher):
 
             base = self.pairs.loc[pair]['base']
 
-            amount = int(self.balance.loc[base]['vol'] * 0.99) # Sell 99% of everything
+            amount = int(self.balance.loc[base]['vol'])
 
             ordermin = float(self.pairs.loc[pair]['ordermin'])
             if amount < ordermin:
@@ -157,7 +157,7 @@ class KrakenDispatcher(Dispatcher):
             self.buys[pair].extend(extension)
             self.sells[pair].extend(extension)
 
-        #if len(self.data[pair].index) > 800:
+        # if len(self.data[pair].index) > 800:
         #   self.data[pair] = self.data[pair].iloc[-750:]
 
         return self.data[pair]
@@ -170,7 +170,7 @@ class KrakenDispatcher(Dispatcher):
         info = data[1]
         ask = float(info['a'][0])
         bid = float(info['b'][0])
-        #print("PAIR %s ASK: %s BID: %s" % (pair, ask, bid))
+        # print("PAIR %s ASK: %s BID: %s" % (pair, ask, bid))
 
         self.ticker_info[pair] = {'ask': ask, 'bid': bid}
 
@@ -204,7 +204,7 @@ def KrakenTradingBot(pairs, interval):
     def ws_message(ws, message):
         j = json.loads(message)
         if 'channelID' in j:
-            ws_channels[j['channelID']] = {'pair':j['pair'], 'subscription':j['subscription']}
+            ws_channels[j['channelID']] = {'pair': j['pair'], 'subscription':j['subscription']}
 
         if '[' == message[0]:
             cID = j[0]
@@ -229,12 +229,12 @@ def KrakenTradingBot(pairs, interval):
 
     def ws_thread(*args):
         print("Connecting to public WebSocket API")
-        ws = websocket.WebSocketApp("wss://ws.kraken.com/", on_open = ws_open, on_message = ws_message)
+        ws = websocket.WebSocketApp("wss://ws.kraken.com/", on_open=ws_open, on_message=ws_message)
         ws.run_forever()
 
     def ws_auth_thread(*args):
         print("Connecting to private WebSocket API")
-        ws = websocket.WebSocketApp("wss://ws-auth.kraken.com/", on_open = ws_auth_open, on_message = ws_auth_message)
+        ws = websocket.WebSocketApp("wss://ws-auth.kraken.com/", on_open=ws_auth_open, on_message=ws_auth_message)
         ws.run_forever()
 
     # Start a new thread for the WebSocket interface
@@ -254,8 +254,8 @@ if __name__ == '__main__':
         # from chart_utils import display_graph, chart_signals, h_line
 
         print('%d Trades made. %d Winners. %f%% Winners. %f%% %s'
-            % (bot.dispatcher.trades,
-               bot.dispatcher.winning_trades,
-               100*bot.dispatcher.winning_trades/bot.dispatcher.trades if bot.dispatcher.trades > 0 else 0,
-               100*(bot.dispatcher.pnl/1000),
-               "up" if bot.dispatcher.pnl > 0 else "down"))
+              % (bot.dispatcher.trades,
+                 bot.dispatcher.winning_trades,
+                 100*bot.dispatcher.winning_trades/bot.dispatcher.trades if bot.dispatcher.trades > 0 else 0,
+                 100*(bot.dispatcher.pnl/1000),
+                 "up" if bot.dispatcher.pnl > 0 else "down"))
