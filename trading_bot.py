@@ -86,9 +86,10 @@ class TradingBot:
 
             if sleep:
                 time_till_next_candle = curr_candle['time'] + self.dispatcher.interval * 60 - time.time()
-                if time_till_next_candle > 0:
-                    print("%s Sleeping for %ds" % (timestamp(), time_till_next_candle))
-                    time.sleep(time_till_next_candle)
+                print("%s Sleeping for %ds" % (timestamp(), time_till_next_candle))
+                while time_till_next_candle > 0:
+                    time_till_next_candle = curr_candle['time'] + self.dispatcher.interval * 60 - time.time()
+                    self.dispatcher.update()
 
 
 if __name__ == "__main__":
