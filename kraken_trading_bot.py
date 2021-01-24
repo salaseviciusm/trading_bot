@@ -53,6 +53,8 @@ class KrakenDispatcher(Dispatcher):
             quote = self.pairs.loc[pair]['quote']
             amount = int(self.balance.loc[quote]['vol'] / ask)
 
+            print("Trying to buy %d %s" % (amount, self.pairs.loc[pair]['base']))
+
             ordermin = float(self.pairs.loc[pair]['ordermin'])
             if amount < ordermin:
                 print("Minimum order %d %s" % (ordermin, pair))
@@ -93,8 +95,9 @@ class KrakenDispatcher(Dispatcher):
             bid = self.current_bid_price(pair)
 
             base = self.pairs.loc[pair]['base']
-
             amount = int(self.balance.loc[base]['vol'])
+
+            print("Trying to sell %d %s" % (amount, self.pairs.loc[pair]['quote']))
 
             ordermin = float(self.pairs.loc[pair]['ordermin'])
             if amount < ordermin:
@@ -226,6 +229,7 @@ def KrakenTradingBot(pairs, interval):
             if j[1] == 'openOrders':
                 bot.dispatcher.balance = dispatcher.kraken.get_account_balance()
                 print(message)
+                print(bot.dispatcher.balance)
 
     def ws_thread(*args):
         print("Connecting to public WebSocket API")
